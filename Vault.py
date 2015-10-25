@@ -51,7 +51,7 @@ class Vault(object):
 
 	
 	def __init__(self, _base, _name="", _logger=None):
-		if _logger == None self.logger = Logger(sys.stdout)
+		if _logger == None: self.logger = Logger(sys.stdout)
 		self.set_name(str(_name))
 		self.file_system = FileSystem(_base)
 		
@@ -96,15 +96,9 @@ class FileSystem(object):
 	MsDosSubFolders = [SUBFOLDER_VIRUS,
 						SUBFOLDER_WORM,
 						SUBFOLDER_TROJAN]
-	LinuxSubFolders = MsDosSubFolders + 
-						[SUBFOLDER_ROOTKIT,
-							SUBFOLDER_RAT,
-							SUBFOLDER_SPYWARE]		
-	WindowsSubFolders = LinuxSubFolders +
-						[SUBFOLDER_CRYPTER,
-							SUBFOLDER_EXPLOITKIT]
-	AndroidSubFolders = LinuxSubFolders +
-						[SUBFOLDER_EXPLOITKIT]	
+	LinuxSubFolders = MsDosSubFolders + [SUBFOLDER_ROOTKIT,SUBFOLDER_RAT,SUBFOLDER_SPYWARE]		
+	WindowsSubFolders = LinuxSubFolders +[SUBFOLDER_CRYPTER,SUBFOLDER_EXPLOITKIT]
+	AndroidSubFolders = LinuxSubFolders +[SUBFOLDER_EXPLOITKIT]	
 	WebSubFolders = [SUBFOLDER_WEBSHELL,
 						SUBFOLDER_EXPLOITKIT]
 
@@ -120,10 +114,10 @@ class FileSystem(object):
 		SUBFOLDER_OTHERS 	:	[],
 	}
 
-	def __init__(self, _base, _logger=sys.stdout):
-		if _logger == None self.logger = Logger(sys.stdout)
+	def __init__(self, _base, _logger=None):
+		if _logger == None: self.logger = Logger(sys.stdout)
 		self.set_base(_base)
-		FileStructure[self.get_base()] = OperatingSystems
+		self.FileStructure[self.get_base()] = FileSystem.OperatingSystems
 		
 	def __repr__(self):
 		return "<Filesystem @{:s}>".format(self.get_base())
@@ -134,7 +128,7 @@ class FileSystem(object):
 	def set_base(self, _base):
 		if not os.path.isdir(_base):
 			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(_base))
-		self.print_success("Relocated file system to '{:s}'.".format(_base))
+		self.logger.print_success("Relocated file system to '{:s}'.".format(_base))
 		self.base = _base
 		
 	def get_base(self):
@@ -148,8 +142,10 @@ class FileSystem(object):
 				if not os.path.exists(directory):
 					os.makedirs(directory)
 					self.logger.print_success("Created '{:s}'".format(directory))
-					subdirectories = self.FileStructure[system]
-					for subdir in subdirectories:
+				subdirectories = self.FileStructure[system]
+				for s in subdirectories:
+					subdir = os.path.join(directory, s)
+					if not os.path.exists(subdir):
 						os.makedirs(subdir)
 						self.logger.print_success("Created '{:s}'".format(subdir))
 		else:

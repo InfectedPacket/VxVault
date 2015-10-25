@@ -39,6 +39,8 @@
 # Imports Statements
 import sys
 import traceback
+
+from Vault import Vault
 from Logger import Logger
 #//////////////////////////////////////////////////////////
 
@@ -158,6 +160,14 @@ class Shell(object):
 							self.logger.print_error("Unknown property: {:s}".format(property))
 					else:
 						self.logger.print_info("{:s} <property> <value>".format(ShellConfig.CMD_SET))
+				elif (cmd.lower() == ShellConfig.CMD_NEWFAULT):
+					if len(tokens) >= 2:
+						param = ' '.join(tokens[1:])
+						vxvault = Vault(param, self.logger)
+						vxvault.file_system.create_filesystem()
+					else:
+						self.logger.print_info("{:s} <property> <value>".format(ShellConfig.CMD_SET))
+						
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:
