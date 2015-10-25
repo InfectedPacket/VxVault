@@ -55,10 +55,14 @@ class ShellConfig:
 	CMD_HELP = 'help'
 	CMD_QUIT = 'quit'
 
-	PROPERTY_VAULT_BASE		=	"vault-base"
-	DEFAULT_VAULT_BASE = "/tmp"		
+	PROPERTY_VX_PASSWORD		= "vxpass"
+	DEFAULT_VX_PASSWORD 		= "infect3d"		
 	
 	PROMPT = "<<< "
+	
+	properties = {
+		PROPERTY_VX_PASSWORD	:	DEFAULT_VX_PASSWORD
+	}	
 	
 	commands = {
 			"debug" : {
@@ -69,34 +73,23 @@ class ShellConfig:
 			CMD_SET : {
 					"cmd"       : "set",
 					"help"      : "Sets the value of a property.",
-					"choices"	: [PROPERTY_VAULT_BASE]
+					"choices"	: properties.keys()
 					},
 			CMD_SHOW : {
 					"cmd"       : "show",
 					"help"      : "Shows the value of a property.",
-					"choices"	: [PROPERTY_VAULT_BASE]
+					"choices"	: properties.keys()
 					},		
 			CMD_NEWFAULT : {
 					"cmd"       : "new-vault",
-					"help"      : "Creates a new vault usinf the directory specified in '{:s}'.".format(PROPERTY_VAULT_BASE),
+					"help"      : "Creates a new vault.",
 					}
 	}
 	
-	properties = {
-		PROPERTY_VAULT_BASE	:	DEFAULT_VAULT_BASE
-	}
+
 		
 
 class Shell(object):
-	"""
-		Interative shell to Vmfcat. The shell can be use to build a VMF message.
-	"""
-	
-#//////////////////////////////////////////////////////////
-# Constants	
-
-
-#//////////////////////////////////////////////////////////
 	
 	def __init__(self, _output=sys.stdout):
 		"""
