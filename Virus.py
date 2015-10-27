@@ -76,6 +76,7 @@ class Virus(object):
 	VX_PROPERTY_COUNTRY	= "country"
 	VX_PROPERTY_OS		= "os"
 	VX_PROPERTY_ARCHIVE	= "archive"
+	VX_PROPERTY_DETECT	= "detect"
 	VX_PROPERTY_MD5		= "md5"
 	VX_PROPERTY_SHA1	= "sha1"
 	VX_PROPERTY_SHA256	= "sha256"
@@ -188,6 +189,12 @@ class Virus(object):
 	def get_date(self):
 		return self.properties[Virus.VX_PROPERTY_DATE]
 
+	def set_antiviral_results(self, _detections = {}):
+		self.set_property(Virus.VX_PROPERTY_DETECT, _detections)
+		
+	def get_antiviral_results(self):
+		return self.get_property(Virus.VX_PROPERTY_DETECT)
+		
 	def archive(self, _destination, _password, _7z):
 		if (self.files and len(self.files) > 0):
 			if not os.path.isfile(_7z):

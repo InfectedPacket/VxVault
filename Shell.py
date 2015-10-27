@@ -63,6 +63,7 @@ class ShellConfig:
 	CMD_QUIT = 'quit'
 
 	PROPERTY_VX_PASSWORD		= "vxpass"
+	PROPERTY_VX_SCANS			= "scans"
 	DEFAULT_VX_PASSWORD 		= "infect3d"
 
 	PROPERTY_VX_COMPRESS		= "archiver"
@@ -193,6 +194,16 @@ class Shell(object):
 						param = ' '.join(tokens[1:])
 						vx = engine.generate_vx(param)
 						engine.retrieve_vx_metadata(vx)
+						self.logger.print_info("malware information:")
+						self.logger.print_success("\tsize (kb)\t:{:d}".format(vx.get_size()))
+						self.logger.print_success("\tmd5\t\t:{:s}".format(vx.md5()[param]))
+						avs_detect = vx.get_antiviral_results()
+						if (len(avs_detect) > 0):
+							for (av, result) in avs_detect.iteritems():
+								if (result != None):
+									self.logger.print_success("\t{:s}\t\t\t:{:s}".format(av, result))
+						else:
+							self.print_error("No information retrieved for '{:s}'.".format(param))
 					else:
 						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
 												

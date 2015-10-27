@@ -120,6 +120,8 @@ class VirusTotalSource(DataSource):
 				if (vx_data.get("response_code", {}) != 1 or len(vx_scans) <= 0):
 					raise Exception(META_ERROR_NO_METADATA.format(vx_files[0]))
 					
+				scans = {}
 				for scan in vx_scans:
+					scans[scan] = vx_scans[scan][u'result']
 					#print("{:s}:{:s}".format(scan, vx_scans[scan][u'result']))
-					_vx.set_property(scan, vx_scans[scan][u'result'])
+				_vx.set_antiviral_results(scans)
