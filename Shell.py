@@ -41,10 +41,16 @@ import sys
 import traceback
 
 from Vault import Vault
+from Engine import Engine
 from Logger import Logger
 #//////////////////////////////////////////////////////////
 
+#//////////////////////////////////////////////////////////
+# Globals and Constants
+ERR_NULL_OR_EMPTY	=	"Value for variable '{:s}' cannot be null or empty."
 
+
+		
 #//////////////////////////////////////////////////////////
 # Parameter information
 class ShellConfig:
@@ -52,16 +58,23 @@ class ShellConfig:
 	CMD_SET			=	"set"
 	CMD_SHOW		=	"show"
 	CMD_NEWFAULT	= 	"new-vault"	
+	CMD_NEWVX		=	"new-vx"
 	CMD_HELP = 'help'
 	CMD_QUIT = 'quit'
 
 	PROPERTY_VX_PASSWORD		= "vxpass"
-	DEFAULT_VX_PASSWORD 		= "infect3d"		
+	DEFAULT_VX_PASSWORD 		= "infect3d"
+
+	PROPERTY_VX_COMPRESS		= "archiver"
+	WIN32_PROGRAM_7ZIP			= "c:\\program files(x86)\\7-zip\7z.exe"
+	LINUX_PROGRAM_7ZIP			= "/usr/bin/7z"
+	DEFAULT_VX_COMPRESS 		= LINUX_PROGRAM_7ZIP
 	
 	PROMPT = "<<< "
 	
 	properties = {
-		PROPERTY_VX_PASSWORD	:	DEFAULT_VX_PASSWORD
+		PROPERTY_VX_PASSWORD	:	DEFAULT_VX_PASSWORD,
+		PROPERTY_VX_COMPRESS	:	DEFAULT_VX_COMPRESS
 	}	
 	
 	commands = {
@@ -83,7 +96,13 @@ class ShellConfig:
 			CMD_NEWFAULT : {
 					"cmd"       : "new-vault",
 					"help"      : "Creates a new vault.",
-					}
+					"choices"	: []
+					},
+			CMD_NEWVX : {
+					"cmd"       : "new-vx",
+					"help"      : "Creates a new malware object from file. If a directory is provided, multiple 'Virus' objects are created from the files stored in the directory.",
+					"choices"	: []
+					}					
 	}
 	
 
@@ -106,6 +125,7 @@ class Shell(object):
 		
 		# Command entered by the user
 		cmd = ""
+		engine = Engine()
 		self.logger.print_info("Type 'help' to show a list of available commands.")
 		
 		while (cmd.lower() != ShellConfig.CMD_QUIT):
@@ -113,14 +133,17 @@ class Shell(object):
 				self.output.write(ShellConfig.PROMPT)
 				user_input = sys.stdin.readline()
 				tokens = user_input.rstrip().split()
-				cmd = tokens[0]
+				cmd = ""
+				if len(tokens) > 0:
+					cmd = tokens[0]
 				if (cmd.lower() == ShellConfig.CMD_QUIT):
 					pass
 				elif (cmd.lower() == ShellConfig.CMD_HELP):
 					if (len(tokens) == 1):
 						self.logger.print_info("{:s} <property> <value>".format(ShellConfig.CMD_SET))
 						self.logger.print_info("{:s} <property>".format(ShellConfig.CMD_SHOW))
-						self.logger.print_info("{:s}".format(ShellConfig.CMD_NEWFAULT))
+						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
+						self.logger.print_info("{:s} <base-directory>".format(ShellConfig.CMD_NEWFAULT))
 						self.logger.print_info("{:s} <command>".format(ShellConfig.CMD_HELP))
 						self.logger.print_info("{:s}".format(ShellConfig.CMD_QUIT))
 					else:
@@ -156,13 +179,25 @@ class Shell(object):
 				elif (cmd.lower() == ShellConfig.CMD_NEWFAULT):
 					if len(tokens) >= 2:
 						param = ' '.join(tokens[1:])
-						vxvault = Vault(param, self.logger)
-						vxvault.file_system.create_filesystem()
+						engine.create_vault(param)
 					else:
-						self.logger.print_info("{:s} <property> <value>".format(ShellConfig.CMD_SET))
-						
+						self.logger.print_info("{:s} <base-directory>".format(ShellConfig.CMD_NEWFAULT))
+				elif (cmd.lower() == "load-vault"):
+					if len(tokens) >= 2:
+						param = ' '.join(tokens[1:])
+						engine.load_vault(param)
+					else:
+						self.logger.print_info("{:s} <base-directory>".format(ShellConfig.CMD_NEWFAULT))						
+				elif (cmd.lower() == ShellConfig.CMD_NEWVX):
+					if len(tokens) >= 2:
+						param = ' '.join(tokens[1:])
+						vx = engine.generate_vx(param)
+						engine.retrieve_vx_metadata(vx)
+					else:
+						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
+												
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:
-				self.logger.print_error("An exception as occured: {:s}".format(e.message))
+				self.logger.print_error("An exception as occured: {:}".format(e.message))
 				traceback.print_exc(file=sys.stdout)

@@ -30,6 +30,18 @@
 # <date>2015-03-26</date>
 # <url>https://github.com/infectedpacket</url>
 
+#//////////////////////////////////////////////////////////
+# Imports Statements
+import os
+import sys
+import hashlib
+import traceback
+
+from Logger import Logger
+#//////////////////////////////////////////////////////////
+
+VIRUS_ERROR_7Z_NOTFOUND = "Could not find archiving program: {:s}."
+
 class Virus(object):
 
 	VX_CLASS_VIRUS 		= "Virus"
@@ -40,6 +52,8 @@ class Virus(object):
 	VX_CLASS_SPYWARE	= "Spyware"
 	VX_CLASS_WEBSHELL	= "WebShell"
 	VX_CLASS_CRYPTER	= "Crypter"
+	VX_CLASS_BACKDOOR	= "Backdoor"
+	VX_CLASS_KEYLOGGER	= "Keylogger"
 	VX_CLASS_OTHER		= "Other"
 	VX_CLASS_UNKNOWN	= "Unknown"
 
@@ -51,8 +65,7 @@ class Virus(object):
 	DEFAULT_VX_DATE		= "1900"
 	DEFAULT_VX_COUNTRY	= UNKNOWN
 	DEFAULT_VX_OS		= UNKNOWN
-	WIN32_PROGRAM_7ZIP	= "c:\\program files(x86)\\7-zip\7z.exe"
-	LINUX_PROGRAM_7ZIP	= "/usr/bin/7z"
+
 	EXTENSION_7Z		= ".7z"
 
 	VX_PROPERTY_NAME	= "name"
@@ -68,21 +81,35 @@ class Virus(object):
 	VX_PROPERTY_SHA256	= "sha256"
 	VX_PROPERTY_SSDEEP	= "ssdeep"
 
+	VirusClasses = [
+		VX_CLASS_VIRUS,
+		VX_CLASS_WORM,
+		VX_CLASS_TROJAN,
+		VX_CLASS_ROOTKIT,
+		VX_CLASS_EXPLOIT,
+		VX_CLASS_SPYWARE,
+		VX_CLASS_WEBSHELL,
+		VX_CLASS_CRYPTER,
+		VX_CLASS_BACKDOOR,
+		VX_CLASS_KEYLOGGER
+	]
+		
+	
 	def __init__(self):
 		self.files = []
 		self.properties = {}
-		self.properties[VX_PROPERTY_NAME] = DEFAULT_VX_NAME
-		self.properties[VX_PROPERTY_SIZE] = DEFAULT_VX_SIZE
-		self.properties[VX_PROPERTY_CLASS] = DEFAULT_VX_CLASS
-		self.properties[VX_PROPERTY_VERS] = DEFAULT_VX_VERS
-		self.properties[VX_PROPERTY_DATE] = DEFAULT_VX_DATE
-		self.properties[VX_PROPERTY_COUNTRY] = DEFAULT_VX_COUNTRY
-		self.properties[VX_PROPERTY_OS] = DEFAULT_VX_OS
-		self.properties[VX_PROPERTY_ARCHIVE] = ""
-		self.properties[VX_PROPERTY_MD5] = {}
-		self.properties[VX_PROPERTY_SHA1] = {}
-		self.properties[VX_PROPERTY_SHA256] = {}
-		self.properties[VX_PROPERTY_SSDEEP] = {}
+		self.properties[Virus.VX_PROPERTY_NAME] = Virus.DEFAULT_VX_NAME
+		self.properties[Virus.VX_PROPERTY_SIZE] = Virus.DEFAULT_VX_SIZE
+		self.properties[Virus.VX_PROPERTY_CLASS] = Virus.DEFAULT_VX_CLASS
+		self.properties[Virus.VX_PROPERTY_VERS] = Virus.DEFAULT_VX_VERS
+		self.properties[Virus.VX_PROPERTY_DATE] = Virus.DEFAULT_VX_DATE
+		self.properties[Virus.VX_PROPERTY_COUNTRY] = Virus.DEFAULT_VX_COUNTRY
+		self.properties[Virus.VX_PROPERTY_OS] = Virus.DEFAULT_VX_OS
+		self.properties[Virus.VX_PROPERTY_ARCHIVE] = ""
+		self.properties[Virus.VX_PROPERTY_MD5] = {}
+		self.properties[Virus.VX_PROPERTY_SHA1] = {}
+		self.properties[Virus.VX_PROPERTY_SHA256] = {}
+		self.properties[Virus.VX_PROPERTY_SSDEEP] = {}
 
 	def __repr__(self):
 		vx_id = self.get_name()
@@ -106,10 +133,10 @@ class Virus(object):
 		self.files.append(_file)
 
 	def get_archive(self):
-		return self.get_property(VX_PROPERTY_ARCHIVE)
+		return self.get_property(Virus.VX_PROPERTY_ARCHIVE)
 
 	def set_archive(self, _archive):
-		self.set_property(VX_PROPERTY_ARCHIVE, _archive)
+		self.set_property(Virus.VX_PROPERTY_ARCHIVE, _archive)
 
 	def set_property(self, _property, _value):
 		self.properties[_property] = _value
@@ -121,50 +148,50 @@ class Virus(object):
 		return self.files
 
 	def set_name(self, _name):
-		self.set_property(VX_PROPERTY_NAME, _name)
+		self.set_property(Virus.VX_PROPERTY_NAME, _name)
 
 	def get_name(self):
-		return self.properties[VX_PROPERTY_NAME]
+		return self.get_property(Virus.VX_PROPERTY_NAME)
 
 	def set_class(self, _class):
-		self.set_property(VX_PROPERTY_CLASS, _class)
+		self.set_property(Virus.VX_PROPERTY_CLASS, _class)
 
 	def get_class(self):
-		return self.get_property(VX_PROPERTY_CLASS)
+		return self.get_property(Virus.VX_PROPERTY_CLASS)
 
 	def set_os(self, _os):
-		self.set_property(VX_PROPERTY_OS, _os)
+		self.set_property(Virus.VX_PROPERTY_OS, _os)
 
 	def get_os(self):
-		return self.get_property(VX_PROPERTY_OS)
+		return self.get_property(Virus.VX_PROPERTY_OS)
 
 	def set_version(self, _version):
-		self.set_property(VX_PROPERTY_VERS, _version)
+		self.set_property(Virus.VX_PROPERTY_VERS, _version)
 
 	def get_version(self):
-		return self.get_property(VX_PROPERTY_VERS)
+		return self.get_property(Virus.VX_PROPERTY_VERS)
 
 	def reset_size(self):
-		self.set_property(VX_PROPERTY_SIZE, 0)
+		self.set_property(Virus.VX_PROPERTY_SIZE, 0)
 
 	def add_size(self, _size):
 		current_size = self.get_size()
 		new_size = current_size + _size
-		self.set_property(VX_PROPERTY_SIZE, new_size)
+		self.set_property(Virus.VX_PROPERTY_SIZE, new_size)
 
 	def get_size(self):
-		return self.properties[VX_PROPERTY_SIZE]
+		return self.properties[Virus.VX_PROPERTY_SIZE]
 
 	def get_country(self):
-		return self.properties[VX_PROPERTY_COUNTRY]
+		return self.properties[Virus.VX_PROPERTY_COUNTRY]
 
 	def get_date(self):
-		return self.properties[VX_PROPERTY_DATE]
+		return self.properties[Virus.VX_PROPERTY_DATE]
 
 	def archive(self, _destination, _password, _7z):
 		if (self.files and len(self.files) > 0):
 			if not os.path.isfile(_7z):
-				raise Exception("Could not find 7z archiving program ({:s})".format(_7z))
+				raise Exception(VIRUS_ERROR_7Z_NOTFOUND.format(_7z))
 
 			vx_file = self.__repr__()	
 			vx_dst_file = os.path.join(_destination, os.path.basename(vx_file))
@@ -183,7 +210,7 @@ class Virus(object):
 
 	def md5(self):
 		files = self.get_files()
-		md5 = self.properties[VX_PROPERTY_MD5]
+		md5 = self.properties[Virus.VX_PROPERTY_MD5]
 		for file in files:
 			hash = hashlib.md5()
  			with open(file, "rb") as f:
@@ -194,18 +221,18 @@ class Virus(object):
 
 	def sha1(self):
 		files = self.get_files()
-		sha1 = self.properties[VX_PROPERTY_SHA1]
+		sha1 = self.properties[Virus.VX_PROPERTY_SHA1]
 		for file in files:
 			sha1[file] = ""
 		return sha1
 
 	def sha256(self):
 		files = self.get_files()
-		sha256 = self.properties[VX_PROPERTY_SHA256]
+		sha256 = self.properties[Virus.VX_PROPERTY_SHA256]
 		for file in files:
 			sha256[file] = ""
 		return sha256
 
 	def ssdeep(self):
-		ssdeep = self.properties[VX_PROPERTY_SSDEEP]
+		ssdeep = self.properties[Virus.VX_PROPERTY_SSDEEP]
 		return ssdeep

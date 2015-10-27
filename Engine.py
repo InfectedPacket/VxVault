@@ -27,126 +27,115 @@
 # </copyright>
 # <author>Jonathan Racicot</author>
 # <email>infectedpacket@gmail.com</email>
-# <date>2015-10-25</date>
+# <date>2015-03-26</date>
 # <url>https://github.com/infectedpacket</url>
+
+__version_info__ = ('0','1','0')
+__version__ = '.'.join(__version_info__)
+
 
 #//////////////////////////////////////////////////////////
 # Imports Statements
 import os
 import sys
+import simplejson
+import urllib
+import urllib2
 import os.path
+import platform
+import traceback
 
+from Vault import Vault
+from Virus import Virus
 from Logger import Logger
+from DataSources import *
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 # Constants
-VAULT_ERROR_INVALID_BASE_DIR = "Invalid base directory: '{:s}'."
+ENGINE_ERROR_INVALID_FILE	=	"Invalid file: {:s}."
+ENGINE_ERROR_ARCHIVER_404	=	"Could not find archiving program: {:s}."
+ENGINE_ERROR_UNKNOWN_TYPE	=	"Unknown file type: {:s}."
+ENGINE_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
+
+VT_KEY	=	"7eecda5aafd0ad150e087e9868385540d96354560bd6a51b29c6f0f32a7ef025"
+
+DS_VIRUS_TOTAL = "VirusTotal"
+
+DEFAULT_DATA_SOURCE = DS_VIRUS_TOTAL
 
 #//////////////////////////////////////////////////////////
 
-#//////////////////////////////////////////////////////////
-# Classes
-class Vault(object):
+class Engine(object):
 
-	
-	def __init__(self, _base, _name="", _logger=None):
+	def __init__(self, _logger=None):
 		if _logger == None: self.logger = Logger(sys.stdout)
-		self.set_name(str(_name))
-		self.file_system = FileSystem(_base)
+		else: self.logger = _logger
+		self.data_sources = {}
+		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(VT_KEY)
+		
+		self.vxvault = None
 		
 	def __repr__(self):
-		return "<Vault '{:s}' @{:s}>".format(
-			self.get_name(), self.file_system.get_base())
+		return "<VxVault Engine {:s}>".format(__version__)
 		
-	def set_name(self, _name):
-		self.name = str(_name)
+	def is_windows(self):
+		return ("win" in platform.system().lower())
 
-	def get_name(self):
-		return self.name
-
-class FileSystem(object):
-	SUBFOLDER_WINDOWS 	= "win"
-	SUBFOLDER_MSDOS 	= "msdos"
-	SUBFOLDER_LINUX 	= "linux"
-	SUBFOLDER_UNIX 		= "unix"
-	SUBFOLDER_OSX 		= "osx"
-	SUBFOLDER_ANDROID	= "android"
-	SUBFOLDER_WEB		= "web"
-	SUBFOLDER_ANY		= "any"
-	SUBFOLDER_OTHERS	= "other"
-	
-	SUBFOLDER_VIRUS		= "virus"
-	SUBFOLDER_WORM		= "worm"
-	SUBFOLDER_TROJAN	= "trojan"
-	SUBFOLDER_ROOTKIT	= "rootkit"
-	SUBFOLDER_EXPLOITKIT= "exploitkit"
-	SUBFOLDER_RAT		= "rat"
-	SUBFOLDER_WEBSHELL	= "web"
-	SUBFOLDER_CRYPTER	= "crypter"
-	SUBFOLDER_SPYWARE	= "spyware"
-	
-	OperatingSystems = [SUBFOLDER_WINDOWS,
-						SUBFOLDER_MSDOS,
-						SUBFOLDER_LINUX,
-						SUBFOLDER_UNIX,
-						SUBFOLDER_OSX,
-						SUBFOLDER_ANDROID,
-						SUBFOLDER_WEB,
-						SUBFOLDER_ANY,
-						SUBFOLDER_OTHERS]
-	MsDosSubFolders = [SUBFOLDER_VIRUS,
-						SUBFOLDER_WORM,
-						SUBFOLDER_TROJAN]
-	LinuxSubFolders = MsDosSubFolders + [SUBFOLDER_ROOTKIT,SUBFOLDER_RAT,SUBFOLDER_SPYWARE]		
-	WindowsSubFolders = LinuxSubFolders +[SUBFOLDER_CRYPTER,SUBFOLDER_EXPLOITKIT]
-	AndroidSubFolders = LinuxSubFolders +[SUBFOLDER_EXPLOITKIT]	
-	WebSubFolders = [SUBFOLDER_WEBSHELL,
-						SUBFOLDER_EXPLOITKIT]
-
-	FileStructure = {
-		SUBFOLDER_WINDOWS 	:	WindowsSubFolders,
-		SUBFOLDER_MSDOS 	:	MsDosSubFolders,
-		SUBFOLDER_LINUX 	:	LinuxSubFolders,
-		SUBFOLDER_UNIX 		:	LinuxSubFolders,
-		SUBFOLDER_OSX 		:	LinuxSubFolders,
-		SUBFOLDER_ANDROID 	:	AndroidSubFolders,
-		SUBFOLDER_WEB		: 	WebSubFolders,
-		SUBFOLDER_ANY		: 	WindowsSubFolders,		
-		SUBFOLDER_OTHERS 	:	[],
-	}
-
-	def __init__(self, _base, _logger=None):
-		if _logger == None: self.logger = Logger(sys.stdout)
-		self.set_base(_base)
-		self.FileStructure[self.get_base()] = FileSystem.OperatingSystems
-		
-	def __repr__(self):
-		return "<Filesystem @{:s}>".format(self.get_base())
-		
-	def set_base(self, _base):
-		if not os.path.isdir(_base):
-			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(_base))
-		self.logger.print_success("Relocated file system to '{:s}'.".format(_base))
-		self.base = _base
-		
-	def get_base(self):
-		return self.base
-	
-	def create_filesystem(self):
-		if (self.get_base() and os.path.isdir(self.get_base())):
-			systems = self.FileStructure[self.get_base()]
-			for system in systems:
-				directory = os.path.join(self.get_base(), system)
-				if not os.path.exists(directory):
-					os.makedirs(directory)
-					self.logger.print_success("Created '{:s}'".format(directory))
-				subdirectories = self.FileStructure[system]
-				for s in subdirectories:
-					subdir = os.path.join(directory, s)
-					if not os.path.exists(subdir):
-						os.makedirs(subdir)
-						self.logger.print_success("Created '{:s}'".format(subdir))
+	def set_archiver(self, _program):
+		if (os.path.isfile(_program)):
+			self.archiver = _program
 		else:
-			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(self.base))
-				
+			raise Exception(ENGINE_ERROR_ARCHIVER_404.format(_program))
+		
+	def get_archiver(self):
+		return self.archiver		
+		
+	def create_vault(self, _base):
+		self.vxvault = Vault(_base, self.logger)
+		self.vxvault.file_system.create_filesystem()	
+		
+	def load_vault(self, _base):
+		self.vxvault = Vault(_base, self.logger)
+		
+	def generate_vx(self, _file, _name=Virus.DEFAULT_VX_NAME):
+		if os.path.isfile(_file):
+			vx = self.generate_vx_from_file(_file, _name)
+		elif os.path.isdir(_file):
+			vx = self.generate_vx_from_folder(_file, _name)
+		else:
+			raise Exception(ENGINE_ERROR_UNKNOWN_TYPE.format(_file))
+			
+		return vx
+
+	def retrieve_vx_metadata(self, _vx, _datasource=DEFAULT_DATA_SOURCE):
+		self.data_sources[_datasource].retrieve_metadata(_vx)
+
+	def generate_vx_from_file(self, _file, _name=Virus.DEFAULT_VX_NAME):
+		if not os.path.isfile(_file):
+			raise Exception(ENGINE_ERROR_INVALID_FILE.format(_file))
+
+		vx = Virus()
+		vx.reset_size()
+		vx.set_name(_name)
+		vx.add_size(os.path.getsize(_file))
+		vx.add_file(_file)
+		return vx
+		
+	def generate_vx_from_folder(self, _folder, _name=Virus.DEFAULT_VX_NAME):
+		vx = Virus()
+		vx.reset_size()
+		vx.set_name(_name)
+		files = os.listdir(_folder)
+		for file in files:
+			vx.add_size(os.path.getsize(file))
+			vx.add_file(file)
+		return vx				
+		
+	def archive_virus(self, _vxfile, _destination, _password):
+		compression_program = self.get_archiver()
+		vx_archive = _vxfile.archive(
+			_destination, 
+			_password, 
+			compression_program)
+		return vx_archive		
