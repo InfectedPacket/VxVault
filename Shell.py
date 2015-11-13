@@ -43,6 +43,10 @@ import traceback
 from Vault import Vault
 from Engine import Engine
 from Logger import Logger
+
+#TODO: Remove following imports
+from DataSources import *
+
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
@@ -59,6 +63,7 @@ class ShellConfig:
 	CMD_SHOW		=	"show"
 	CMD_NEWFAULT	= 	"new-vault"	
 	CMD_NEWVX		=	"new-vx"
+	CMD_TEST		=	"test"	
 	CMD_HELP = 'help'
 	CMD_QUIT = 'quit'
 
@@ -206,7 +211,12 @@ class Shell(object):
 							self.print_error("No information retrieved for '{:s}'.".format(param))
 					else:
 						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
-												
+				elif (cmd.lower() == ShellConfig.CMD_TEST):
+					extensions = ["exe", "scr"]
+					malcode_src = MalCodeRssSource(extensions, self.logger)
+					new_files = malcode_src.get_new_urls_since("2012-01-01", _max=10)
+					for (md5, url) in new_files.iteritems():
+						print("{:s}:\t{:s}".format(md5, url))
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:

@@ -149,4 +149,9 @@ class FileSystem(object):
 						self.logger.print_success("Created '{:s}'".format(subdir))
 		else:
 			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(self.base))
-				
+	
+	def create_database(self, _dbfile="", _overwrite=False):
+		VaultDb = VaultDatabase(_logger=self.logger)
+		if (len(_dbfile) > 0):
+			VaultDb.set_db_file(_dbfile)
+		VaultDb.create_db_file(_overwrite)

@@ -27,115 +27,78 @@
 # </copyright>
 # <author>Jonathan Racicot</author>
 # <email>infectedpacket@gmail.com</email>
-# <date>2015-03-26</date>
+# <date>2015-10-25</date>
 # <url>https://github.com/infectedpacket</url>
-
-__version_info__ = ('0','1','0')
-__version__ = '.'.join(__version_info__)
-
 
 #//////////////////////////////////////////////////////////
 # Imports Statements
 import os
 import sys
-import simplejson
-import urllib
-import urllib2
+import sqlite3
 import os.path
-import platform
-import traceback
 
-from Vault import Vault
 from Virus import Virus
 from Logger import Logger
-from DataSources import *
-#//////////////////////////////////////////////////////////
-
 #//////////////////////////////////////////////////////////
 # Constants
-ENGINE_ERROR_INVALID_FILE	=	"Invalid file: {:s}."
-ENGINE_ERROR_ARCHIVER_404	=	"Could not find archiving program: {:s}."
-ENGINE_ERROR_UNKNOWN_TYPE	=	"Unknown file type: {:s}."
-ENGINE_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
-
-VT_KEY	=	"7eecda5aafd0ad150e087e9868385540d96354560bd6a51b29c6f0f32a7ef025"
-
-DS_VIRUS_TOTAL = "VirusTotal"
-
-DEFAULT_DATA_SOURCE = DS_VIRUS_TOTAL
-
+ERR_NULL_OR_EMPTY	=	"Value for variable '{:s}' cannot be null or empty."
+ERR_DB_FILE_EXIST	=	"Vault database already exists in folder."
 #//////////////////////////////////////////////////////////
+# Classes
+class VaultDatabase(object):
 
-class Engine(object):
+	DEFAULT_VAULT_DB_FILE	=	".vxvault.db"
 
-	def __init__(self, _logger=None):
-		if _logger == None: self.logger = Logger(sys.stdout)
-		else: self.logger = _logger
-		self.data_sources = {}
-		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(VT_KEY)
-		
-		self.vxvault = None
-		
-	def __repr__(self):
-		return "<VxVault Engine {:s}>".format(__version__)
-		
-	def is_windows(self):
-		return ("win" in platform.system().lower())
+	TBL_VX		=	"vx"
 
-	def set_archiver(self, _program):
-		if (os.path.isfile(_program)):
-			self.archiver = _program
-		else:
-			raise Exception(ENGINE_ERROR_ARCHIVER_404.format(_program))
+	def __init__(self, _file=VaultDatabase.DEFAULT_VAULT_DB_FILE, _logger=None):
+		if _logger = None: self.logger = Logger(sys.stdout)
+		self.db_file = _file
 		
-	def get_archiver(self):
-		return self.archiver		
-		
-	def create_vault(self, _base):
-		self.vxvault = Vault(_base, self.logger)
-		self.vxvault.file_system.create_filesystem()	
-		
-	def load_vault(self, _base):
-		self.vxvault = Vault(_base, self.logger)
-		
-	def generate_vx(self, _file, _name=Virus.DEFAULT_VX_NAME):
-		if os.path.isfile(_file):
-			vx = self.generate_vx_from_file(_file, _name)
-		elif os.path.isdir(_file):
-			vx = self.generate_vx_from_folder(_file, _name)
-		else:
-			raise Exception(ENGINE_ERROR_UNKNOWN_TYPE.format(_file))
+	def set_db_file(self, _file):
+		if not _file:
+			raise Exception(ERR_NULL_OR_EMPTY.format(u'file'))
 			
-		return vx
-
-	def retrieve_vx_metadata(self, _vx, _datasource=DEFAULT_DATA_SOURCE):
-		self.data_sources[_datasource].retrieve_metadata(_vx)
-
-	def generate_vx_from_file(self, _file, _name=Virus.DEFAULT_VX_NAME):
-		if not os.path.isfile(_file):
-			raise Exception(ENGINE_ERROR_INVALID_FILE.format(_file))
-
-		vx = Virus()
-		vx.reset_size()
-		vx.set_name(_name)
-		vx.add_size(os.path.getsize(_file))
-		vx.add_file(_file)
-		return vx
+		self.db_file = _file
 		
-	def generate_vx_from_folder(self, _folder, _name=Virus.DEFAULT_VX_NAME):
-		vx = Virus()
-		vx.reset_size()
-		vx.set_name(_name)
-		files = os.listdir(_folder)
-		for file in files:
-			vx.add_size(os.path.getsize(file))
-			vx.add_file(file)
-		return vx				
+	def get_db_file(self):
+		return self.db_file
+
+	def create_db_file(self, _overwrite=False):
+		if not self.db_file:
+			raise Exception(ERR_NULL_OR_EMPTY.format(u'db_file'))	
+	
+		if (self.db_file_exists() and _overwrite):
+			os.remove(self.db_file)
+		elif (self.db_file_exist() and not _overwrite):
+			raise Exception(ERR_DB_FILE_EXIST)
+			
+		#Creates the file
+		open(self.db_file, 'w').close()
 		
-	def archive_virus(self, _vxfile, _destination, _password):
-		compression_program = self.get_archiver()
-		vx_archive = _vxfile.archive(
-			_destination, 
-			_password, 
-			compression_program)
-		return vx_archive		
+		db_conn = sqlite3.connect(self.db_file)
+		db_cursor = db_conn.cursor()
+		
+		db_conn.close()
+		
+	def db_file_exists(self):
+		return os.path.isfile(self.db_file)
+		
+	def create_vx(self, _vx):
+		print("not implemented")
+		
+	def read_vx_by_md5(self, _md5):
+		print("not implemented")
+	
+	def read_vx_by_file(self, _md5):
+			print("not implemented")
+	
+	def update_vx(self, _vx):
+		print("not implemented")
+		
+	def delete_vx(self, _vx):
+		print("not implemented")
+		
+	def vx_exists(self, _vx):
+		print("not implemented")
+		
