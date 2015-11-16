@@ -44,17 +44,17 @@ from Vault import Vault
 from Engine import Engine
 from Logger import Logger
 
-#TODO: Remove following imports
+#TODO: Remove following imports / move to Engine
 from DataSources import *
+from Hunters import Hunter
 
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 # Globals and Constants
 ERR_NULL_OR_EMPTY	=	"Value for variable '{:s}' cannot be null or empty."
+#//////////////////////////////////////////////////////////
 
-
-		
 #//////////////////////////////////////////////////////////
 # Parameter information
 class ShellConfig:
@@ -212,11 +212,9 @@ class Shell(object):
 					else:
 						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
 				elif (cmd.lower() == ShellConfig.CMD_TEST):
-					extensions = ["exe", "scr"]
-					malcode_src = MalCodeRssSource(extensions, self.logger)
-					new_files = malcode_src.get_new_urls_since("2012-01-01", _max=10)
-					for (md5, url) in new_files.iteritems():
-						print("{:s}:\t{:s}".format(md5, url))
+					vx_pit = "C:\\vx\\warning\\biohazard"
+					vx_hunter = Hunter(_pit=vx_pit, _logger=self.logger)
+					vx_hunter.start()
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:

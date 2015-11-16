@@ -50,8 +50,7 @@ MSG_INFO_NB_ENTRIES		=	"{:d} new entries found."
 MSG_WARN_NB_ENTRIES		=	"Considering only {:d} entries."
 
 ERR_NULL_OR_EMPTY		=	"Value for variable '{:s}' cannot be null or empty."
-ERR_INVALID_DEST_DIR	=	"Invalid destination folder: '{:s}'."
-ERR_FAILED_PARSE_MALCODE=	"Failed to parse MalC0de feed : '{s}'."
+
 META_ERROR_INVALID_SRC	=	"Invalid source: '{:s}'."
 META_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
 
@@ -138,49 +137,3 @@ class VirusTotalSource(DataSource):
 					#print("{:s}:{:s}".format(scan, vx_scans[scan][u'result']))
 				_vx.set_antiviral_results(scans)
 				
-class MalCodeRssSource(object):
-
-	URL = 'http://malc0de.com/rss/'
-	URL_MARKER = "URL:"
-	
-	def __init__(self, _extensions = [], _logger=None):
-		if _logger == None: self.logger = Logger(sys.stdout)
-		else: self.logger = _logger
-		self.allowed_extensions = _extensions
-		
-	def get_new_urls_since(self, _date, _max=50):
-		urls = {}
-		if (_dst and os.path.isdir(_dst)):
-			self.logger.print_info(MSG_INFO_CONNECTING.format(MalCodeRssSource.URL))
-			malcode_rss = feedparser.parse(MalCodeRssSource.URL)
-			nb_entries = len(malcode_rss.entries)
-			self.logger.print_info(MSG_INFO_NB_ENTRIES.format(nb_entries))				
-			if (nb_entries > _max):
-				nb_entries = _max
-				self.logger.print_warning(MSG_WARN_NB_ENTRIES.format(nb_entries))
-			
-			for i in range(0, nb_entries):
-				post = malcode_rss.entries[i]
-				desc = post.summary
-				
-				desc_items = desc.split(",")
-				if (len(desc_items) == 5):
-					if (MalCodeRssSource.URL_MARKER in desc_items[0]):
-						vx_url = desc_items[0].split(":")[1]
-						vx_file = vx_url.split("/")[-1]						
-						vx_ext = vx_file.split('.')[-1]
-						if (len(vx_ext) > 5):
-							vx_ext = ""
-						vx_md5 = desc_items[4].split(":")[1]
-						display_file = vx_file
-						if (len(vx_file) > 10):
-							display_file = "{:s}(...).{:s}".format(vx_file[0:8], vx_ext)
-						self.logger.print_info("New! {:s}:\t{:s}".format(vx_md5, display_file))
-						if (vx_ext in self.allowed_extensions):
-							urls[vx_md5] = vx_url
-
-				else:
-					raise Exception(ERR_FAILED_PARSE_MALCODE.format(desc))
-		else:
-			raise Exception(ERR_INVALID_DEST_DIR.format(_dst))
-		return urls
