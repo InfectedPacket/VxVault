@@ -35,9 +35,12 @@
 import os
 import abc
 import sys
+import time
 import urllib
 import urllib2
+import threading
 import os.path
+import shutil
 import simplejson
 import feedparser
 
@@ -45,7 +48,11 @@ from Logger import Logger
 from Virus import Virus
 #//////////////////////////////////////////////////////////
 
+#//////////////////////////////////////////////////////////
+# Globals and Constants
+ERR_INVALID_DEST_DIR	=	"Invalid destination folder: '{:s}'."
 MSG_INFO_CONNECTING 	=	"Connecting to '{:s}'..."
+MSG_INFO_ANALYZING		=	"Analyzing '{:s}' ..."
 MSG_INFO_NB_ENTRIES		=	"{:d} new entries found."
 MSG_WARN_NB_ENTRIES		=	"Considering only {:d} entries."
 
@@ -54,8 +61,62 @@ ERR_NULL_OR_EMPTY		=	"Value for variable '{:s}' cannot be null or empty."
 META_ERROR_INVALID_SRC	=	"Invalid source: '{:s}'."
 META_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
 
+AV_AVAST		=	"Avast"
+AV_AVG			=	"AVG"
+AV_AVIRA		=	"Avira"
+AV_BITDEFENDER	=	"BitDefender"
+AV_CLAM			=	"ClamAV"
+AV_FORTINET		=	"Fortinet"
+AV_COMODO		=	"Comodo"
+AV_FSECURE		=	"F-Secure"
+AV_GDATA		=	"GData"
+AV_MALBYTES		=	"MalwareBytes"
+AV_MCAFEE		=	"McAfee"
+AV_PANDA		=	"Panda"
+AV_SOPHOS		=	"Sophos"
+AV_ESET			=	"ESET"
+AV_SYMANTEC		=	"Symantec"
+AV_TRENDMICRO	=	"Trend Micro"
+AV_MICROSOFT	=	"Microsoft"
+AV_KASPERSKY	=	"Kaspersky"
+AV_BAIDU		=	"Baidu-International"
+
+#//////////////////////////////////////////////////////////
+
 #//////////////////////////////////////////////////////////
 # Classes
+
+class Analyzer(threading.Thread):
+
+	def __init__(self, _pit, _logger=None):
+		threading.Thread.__init__(self)
+		if _logger == None: self.logger = Logger(sys.stdout)
+		else: self.logger = _logger
+		
+		if (_pit and os.path.isdir(_pit)):
+			self.pit = _pit
+		else:
+			raise Exception(ERR_INVALID_DEST_DIR.format(_dst))
+		
+	def stop_analysis():
+		self.analyze = False
+		
+	def run(self):
+	
+		vt_source = VirusTotalSource()
+	
+		while (self.analyze):
+			vx_in_pit = [ os.path.join(self.pit, f) for f in os.listdir(self.pit) if os.path.isfile(os.path.join(self.pit, f)) ]
+			if (len(vx_in_pit) > 0):
+				for vx_file in vx_in_pit:
+					self.logger.print_info(MSG_INFO_ANALYZING.format(vx_file))
+					vx = Virus()
+					vx.add_file(vx_file)
+					vx_data = vt_source.retrieve_metadata(vx)
+					
+			time.delay(300)
+	
+
 class DataSource(object):
 	__metaclass__ = abc.ABCMeta
 	
@@ -111,7 +172,7 @@ class VirusTotalSource(DataSource):
 	PARAM_APIKEY = "apikey"
 	URL_VT_REPORT = "https://www.virustotal.com/vtapi/v2/file/report"
 
-	def __init__(self, _api):
+	def __init__(self, _api=PARAM_APIKEY):
 		super(VirusTotalSource, self).__init__(VirusTotalSource.URL_VT_REPORT)
 		self.add_parameter(VirusTotalSource.PARAM_APIKEY, _api)
 
