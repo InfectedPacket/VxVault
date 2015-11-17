@@ -225,9 +225,9 @@ class Shell(object):
 							vx_hunter = LocalHunter(_pit=vx_pit, _dir=vx_local, _logger=self.logger)
 							vx_hunter.start()
 						else:
-							self.print_error("Unknown option for '{:s}': {:s}".format(tokens[1], ShellConfig.CMD_HUNT))
+							self.logger.print_error("Unknown option for '{:s}': {:s}".format(tokens[1], ShellConfig.CMD_HUNT))
 					else:
-						self.print_error("{:s} malcode|(local <directory>) <pit>".format(ShellConfig.CMD_HUNT))
+						self.logger.print_error("{:s} malcode|(local <directory>) <pit>".format(ShellConfig.CMD_HUNT))
 			
 				elif (cmd.lower() == ShellConfig.CMD_TEST):		
 					pit = "C:\\vx\\warning\\biohazard"
