@@ -194,7 +194,23 @@ class Virus(object):
 		
 	def get_antiviral_results(self):
 		return self.get_property(Virus.VX_PROPERTY_DETECT)
-		
+	
+	def is_detected_by(self, _av):
+		av_results = self.get_antiviral_results()
+		detected = False
+		if (len(av_results) > 0):
+			if _av in av_results:
+				return av_results[_av].detected
+		return detected
+	
+	def get_detection_by(self, _av):
+		av_results = self.get_antiviral_results()
+		detected = False
+		if (len(av_results) > 0):
+			if _av in av_results:
+				return av_results[_av].result
+		return detected	
+	
 	def archive(self, _destination, _password, _7z):
 		if (self.files and len(self.files) > 0):
 			if not os.path.isfile(_7z):
