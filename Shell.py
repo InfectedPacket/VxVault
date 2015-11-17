@@ -46,7 +46,9 @@ from Logger import Logger
 
 #TODO: Remove following imports / move to Engine
 from DataSources import *
-from Hunters import Hunter
+from Hunters import *
+import urllib2
+from BeautifulSoup import BeautifulSoup
 
 #//////////////////////////////////////////////////////////
 
@@ -63,6 +65,7 @@ class ShellConfig:
 	CMD_SHOW		=	"show"
 	CMD_NEWFAULT	= 	"new-vault"	
 	CMD_NEWVX		=	"new-vx"
+	CMD_HUNT		=	"hunt"
 	CMD_TEST		=	"test"	
 	CMD_HELP = 'help'
 	CMD_QUIT = 'quit'
@@ -211,10 +214,33 @@ class Shell(object):
 							self.print_error("No information retrieved for '{:s}'.".format(param))
 					else:
 						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
-				elif (cmd.lower() == ShellConfig.CMD_TEST):
-					vx_pit = "C:\\vx\\warning\\biohazard"
-					vx_hunter = Hunter(_pit=vx_pit, _logger=self.logger)
-					vx_hunter.start()
+				elif (cmd.lower() == ShellConfig.CMD_HUNT):
+					if len(tokens) >= 3:
+						vx_pit = tokens[-1]
+						if (tokens[1] == "malcode"):
+							vx_hunter = MalcodeHunter(_pit=vx_pit, _logger=self.logger)
+							vx_hunter.start()
+						elif (tokens[1] == "local"):
+							vx_local = tokens[2]
+							vx_hunter = LocalHunter(_pit=vx_pit, _dir=vx_local, _logger=self.logger)
+							vx_hunter.start()
+						else:
+							self.print_error("Unknown option for '{:s}': {:s}".format(tokens[1], ShellConfig.CMD_HUNT))
+					else:
+						self.print_error("{:s} malcode|(local <directory>) <pit>".format(ShellConfig.CMD_HUNT))
+			
+				elif (cmd.lower() == ShellConfig.CMD_TEST):		
+					pit = "C:\\vx\\warning\\biohazard"
+					vx_in_pit = [ os.path.join(pit, f) for f in os.listdir(pit) if os.path.isfile(os.path.join(pit, f)) ]
+					vt_source = VirusTotalSource()
+					if (len(vx_in_pit) > 0):
+						vx_file = vx_in_pit[0]
+						vx = Virus()
+						vx.add_file(vx_file)
+						vx_file = vx.get_files()[0]
+						print("MD5:" + vx.md5()[vx_file])
+						#vx_data = vt_source.retrieve_metadata(vx)
+						#print(vx_data)
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:
