@@ -66,7 +66,7 @@ class Hunter(threading.Thread):
 	DefaultHuntInterval = 60
 	HuntedExtensions = ["exe", "scr", "doc", "pdf", "apk", "jar", "docx", "zip"]
 
-	def __init__(self, _pit, _localarea="", _extensions = HuntedExtensions, _logger=None):
+	def __init__(self, _pit, _extensions = HuntedExtensions, _logger=None):
 		threading.Thread.__init__(self)
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger	
@@ -122,8 +122,8 @@ class MalcodeHunter(Hunter):
 	def get_new_urls_since(self, _date, _max=150):
 		urls = []
 		
-		self.logger.print_info(MSG_INFO_CONNECTING.format(MalCodeRssSource.URL))
-		malcode_rss = feedparser.parse(MalCodeRssSource.URL)
+		self.logger.print_info(MSG_INFO_CONNECTING.format(MalcodeHunter.URL))
+		malcode_rss = feedparser.parse(MalcodeHunter.URL)
 		nb_entries = len(malcode_rss.entries)
 		self.logger.print_info(MSG_INFO_NB_ENTRIES.format(nb_entries))				
 		if (nb_entries > _max):
@@ -132,15 +132,15 @@ class MalcodeHunter(Hunter):
 		
 		for i in range(0, nb_entries):
 			post = malcode_rss.entries[i]
-			if (post == self.last_entry):
-				break
-			self.last_entry = post
+			#if (post == self.last_entry):
+			#	break
+			#self.last_entry = post
 			
 			desc = post.summary
 			
 			desc_items = desc.split(",")
 			if (len(desc_items) == 5):
-				if (MalCodeRssSource.URL_MARKER in desc_items[0]):
+				if (MalcodeHunter.URL_MARKER in desc_items[0]):
 					vx_url = "http://{:s}".format(desc_items[0].split(":")[1].strip())
 											
 					vx_file = vx_url.split("/")[-1]						
@@ -148,7 +148,7 @@ class MalcodeHunter(Hunter):
 					if (len(vx_ext) > 5):
 						vx_ext = ""
 
-					if (vx_ext in self.allowed_extensions):
+					if (vx_ext in self.extensions):
 						urls.append(vx_url)
 			else:
 				raise Exception(ERR_FAILED_PARSE_MALCODE.format(desc))
@@ -172,13 +172,16 @@ class LocalHunter(Hunter):
 		for file in local_files:
 			self.logger.print_debug("Processing '{:s}'...".format(file))
 			with open(file, "r") as f:
-				contents = f.read()
+				contents = f.read().lower()
 			if (len(contents) > 0):
 				found_urls = re.findall(r'(h(tt|xx)ps?://[^\s]+)', contents)
-				print(found_urls)
 				for found_url in found_urls:
-					self.logger.print_debug("\t>> {:s}...".format(found_url[0]))
-					urls.append(found_url[0].replace("hxxp", "http"))
+					vx_url = found_url[0]
+					vx_file = vx_url.split("/")[-1]						
+					vx_ext = vx_file.split('.')[-1]
+					if (not "virustotal" in url and vx_ext in self.extensions):
+						self.logger.print_debug("\t>> {:s}...".format(url))
+						urls.append(url.replace("hxxp", "http"))
 			else:
 				self.logger.print_error(ERR_FILE_NO_CONTENTS.format(file))
 		return urls
