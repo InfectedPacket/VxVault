@@ -33,6 +33,7 @@
 #//////////////////////////////////////////////////////////
 # Imports Statements
 import os
+import re
 import abc
 import sys
 import time
@@ -40,78 +41,86 @@ import urllib
 import urllib2
 import threading
 import feedparser
-from datetime import datetime
+from Logger import Logger
+from datetime import datetime, timedelta
+from BeautifulSoup import BeautifulSoup
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 # Globals and Constants
-ERR_INVALID_DEST_DIR	=	"Invalid destination folder: '{:s}'."
+ERR_INVALID_DEST_DIR	=	"Invalid directory: '{:s}'."
 ERR_FAILED_PARSE_MALCODE=	"Failed to parse MalC0de feed : '{s}'."
+ERR_FAILED_DOWNLOAD		=	"Failed to download file '{:s}': {:s}"
+MSG_INFO_DOWNLOADING	=	"Downloading {:s} from {:s}."
+ERR_FILE_NO_CONTENTS	=	"No contents found in '{:s}'."
 MSG_INFO_CONNECTING 	=	"Connecting to '{:s}'..."
 MSG_INFO_NB_ENTRIES		=	"{:d} new entries found."
 MSG_WARN_NB_ENTRIES		=	"Considering only {:d} entries."
+MSG_INFO_NEXT_RUN		=	"Next run: {:%H:%M:%S}"
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 # Classes
 class Hunter(threading.Thread):
 
-	DefaultHuntInterval = 3600
+	DefaultHuntInterval = 60
 	HuntedExtensions = ["exe", "scr", "doc", "pdf", "apk", "jar", "docx", "zip"]
 
-	def __init__(self, _pit, _extensions = HuntedExtensions, _logger=None):
+	def __init__(self, _pit, _localarea="", _extensions = HuntedExtensions, _logger=None):
 		threading.Thread.__init__(self)
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger	
 		self.name="vx-hunter"
-		self.hunt = True
+		self.is_hunting = True
 		if (_pit and os.path.isdir(_pit)):
 			self.pit = _pit
 		else:
 			raise Exception(ERR_INVALID_DEST_DIR.format(_dst))
 		
 		self.extensions = _extensions
-		
-		malcode_area = MalCodeRssSource(_extensions, _logger)
-		
-		self.areas = [malcode_area]
+
 	
 	def stop_hunting(self):
-		self.hunt = False;
+		self.is_hunting = False;
+	
+	@abc.abstractmethod
+	def get_new_urls_since(self, _date, _max=150):
+		return
 	
 	def run(self):
 	
-		while (self.hunt):
-			for area in self.areas:
-				new_targets = area.get_new_urls_since(datetime.now())
-				for (md5, vx_url) in new_targets.iteritems():
-						vx_src_file = vx_url.split("/")[-1]						
-						vx_in_pit = [ f for f in os.listdir(self.pit) if os.path.isfile(f) ]
-						if (not vx_src_file in vx_in_pit):
-							vx_dst_file = os.path.join(self.pit, vx_src_file)
-							self.logger.print_info("Downloading {:s} from {:s}.".format(vx_src_file, vx_url))
-							try:
-								urllib.urlretrieve (vx_url, vx_dst_file)
-							except Exception as e:
-								self.logger.print_error("Failed to download file '{:s}': {:s}".format(vx_src_file, e.message))
-			self.logger.print_info("Next run in 1 hour.")
+		while (self.is_hunting):
+			new_targets = self.get_new_urls_since(datetime.now())
+			for vx_url in new_targets:
+				vx_src_file = vx_url.split("/")[-1]						
+				vx_in_pit = [ f for f in os.listdir(self.pit) if os.path.isfile(f) ]
+				if (not vx_src_file in vx_in_pit):
+					vx_dst_file = os.path.join(self.pit, vx_src_file)
+					self.logger.print_info(MSG_INFO_DOWNLOADING.format(vx_src_file, vx_url))
+					try:
+						urllib.urlretrieve (vx_url, vx_dst_file)
+					except Exception as e:
+						self.logger.print_error(ERR_FAILED_DOWNLOAD.format(vx_src_file, e.message))
+						
+			self.next_hunt = datetime.now() + timedelta(seconds=Hunter.DefaultHuntInterval)
+			self.logger.print_info(MSG_INFO_NEXT_RUN.format(self.next_hunt))
+			#DEBUG:
+			self.is_hunting = False
 			time.sleep(Hunter.DefaultHuntInterval)
 			
 		self.logger.print_warning("Hunt completed. Thread is terminated.")
 		
-class MalCodeRssSource(object):
+class MalcodeHunter(Hunter):
 
 	URL = 'http://malc0de.com/rss/'
 	URL_MARKER = "URL:"
 	
-	def __init__(self, _extensions = [], _logger=None):
-		if _logger == None: self.logger = Logger(sys.stdout)
-		else: self.logger = _logger
-		self.allowed_extensions = _extensions
+	def __init__(self, _pit, _extensions = [], _logger=None):
+		super(MalcodeHunter, self).__init__(_pit, _extensions, _logger)	
 		self.last_entry = ""
-		
-	def get_new_urls_since(self, _date, _max=50):
-		urls = {}
+	
+	def get_new_urls_since(self, _date, _max=150):
+		urls = []
 		
 		self.logger.print_info(MSG_INFO_CONNECTING.format(MalCodeRssSource.URL))
 		malcode_rss = feedparser.parse(MalCodeRssSource.URL)
@@ -132,7 +141,6 @@ class MalCodeRssSource(object):
 			desc_items = desc.split(",")
 			if (len(desc_items) == 5):
 				if (MalCodeRssSource.URL_MARKER in desc_items[0]):
-					#vx_url = desc_items[0]
 					vx_url = "http://{:s}".format(desc_items[0].split(":")[1].strip())
 											
 					vx_file = vx_url.split("/")[-1]						
@@ -141,14 +149,36 @@ class MalCodeRssSource(object):
 						vx_ext = ""
 
 					if (vx_ext in self.allowed_extensions):
-						vx_md5 = desc_items[4].split(":")[1]
-						#display_file = vx_file
-						#if (len(vx_file) > 10):
-						#	display_file = "{:s}(...).{:s}".format(vx_file[0:8], vx_ext)
-						#self.logger.print_info("New! {:s}:\t{:s}".format(vx_md5, display_file))
-						urls[vx_md5] = vx_url
-
+						urls.append(vx_url)
 			else:
 				raise Exception(ERR_FAILED_PARSE_MALCODE.format(desc))
 
-		return urls			
+		return urls	
+	
+
+		
+class LocalHunter(Hunter):
+
+	def __init__(self, _pit, _dir, _extensions = [], _logger=None):
+		super(LocalHunter, self).__init__(_pit, _extensions, _logger)
+		self.dir = _dir
+		
+	def get_new_urls_since(self, _date, _max=150):
+		urls = []
+		self.logger.print_info(MSG_INFO_CONNECTING.format(self.dir))
+		
+		local_files = [ os.path.join(self.dir, f) for f in os.listdir(self.dir) if not os.path.isfile(f) ]
+		
+		for file in local_files:
+			self.logger.print_debug("Processing '{:s}'...".format(file))
+			with open(file, "r") as f:
+				contents = f.read()
+			if (len(contents) > 0):
+				found_urls = re.findall(r'(h(tt|xx)ps?://[^\s]+)', contents)
+				print(found_urls)
+				for found_url in found_urls:
+					self.logger.print_debug("\t>> {:s}...".format(found_url[0]))
+					urls.append(found_url[0].replace("hxxp", "http"))
+			else:
+				self.logger.print_error(ERR_FILE_NO_CONTENTS.format(file))
+		return urls
