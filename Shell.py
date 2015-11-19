@@ -126,15 +126,15 @@ class Shell(object):
 		"""
 		self.output = _output
 		self.logger = Logger(_output, _debug=True)
-
-	def start(self):
+		
+	def start(self, _base, _vtapi):
 		"""
 			Starts the main loop of the interactive shell.
 		"""
 		
 		# Command entered by the user
 		cmd = ""
-		engine = Engine()
+		engine = Engine(_base, _vtapi)
 		self.logger.print_info("Type 'help' to show a list of available commands.")
 		
 		while (cmd.lower() != ShellConfig.CMD_QUIT):
@@ -146,7 +146,7 @@ class Shell(object):
 				if len(tokens) > 0:
 					cmd = tokens[0]
 				if (cmd.lower() == ShellConfig.CMD_QUIT):
-					pass
+					engine.stop_hunters()
 				elif (cmd.lower() == ShellConfig.CMD_HELP):
 					if (len(tokens) == 1):
 						self.logger.print_info("{:s} <property> <value>".format(ShellConfig.CMD_SET))
@@ -218,12 +218,10 @@ class Shell(object):
 					if len(tokens) >= 3:
 						vx_pit = tokens[-1]
 						if (tokens[1] == "malcode"):
-							vx_hunter = MalcodeHunter(_pit=vx_pit, _logger=self.logger)
-							vx_hunter.start()
+							engine.gather_vx_from_malcode()
 						elif (tokens[1] == "local"):
 							vx_local = tokens[2]
-							vx_hunter = LocalHunter(_pit=vx_pit, _dir=vx_local, _logger=self.logger)
-							vx_hunter.start()
+							engine.gather_vx_from_local_files(vx_local)
 						else:
 							self.logger.print_error("Unknown option for '{:s}': {:s}".format(tokens[1], ShellConfig.CMD_HUNT))
 					else:
