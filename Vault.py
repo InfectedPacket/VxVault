@@ -64,6 +64,9 @@ class Vault(object):
 
 	def get_name(self):
 		return self.name
+		
+	def get_pit(self):
+		return self.file_system.get_pit()
 
 class FileSystem(object):
 	SUBFOLDER_WINDOWS 	= "win"
@@ -74,7 +77,7 @@ class FileSystem(object):
 	SUBFOLDER_ANDROID	= "android"
 	SUBFOLDER_WEB		= "web"
 	SUBFOLDER_ANY		= "any"
-	SUBFOLDER_OTHERS	= "other"
+	SUBFOLDER_OTHERS	= "pit"
 	
 	SUBFOLDER_VIRUS		= "virus"
 	SUBFOLDER_WORM		= "worm"
@@ -155,3 +158,6 @@ class FileSystem(object):
 		if (len(_dbfile) > 0):
 			VaultDb.set_db_file(_dbfile)
 		VaultDb.create_db_file(_overwrite)
+		
+	def get_pit(self):
+		return os.path.join(self.get_base(), FileSystem.SUBFOLDER_OTHERS)
