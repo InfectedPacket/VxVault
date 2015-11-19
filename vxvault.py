@@ -45,8 +45,31 @@ __version__ = '.'.join(__version_info__)
 
 #//////////////////////////////////////////////////////////
 # Imports Statements
+import os
 import argparse
 from Shell import *
+#//////////////////////////////////////////////////////////
+
+#//////////////////////////////////////////////////////////
+# Argument Parser Declaration
+#
+usage = PROGRAM_USAGE
+parser = argparse.ArgumentParser(
+	usage=usage, 
+	prog=PROGRAM_NAME, 
+	version="%(prog)s "+__version__, 
+	description=PROGRAM_DESC)
+	
+vault_options = parser.add_argument_group("Vault Options", "Sets basic options for the vault.")
+vault_options.add_argument("-b", "--base", 
+	dest="base", 
+	required=True,
+	default=os.getcwd(),
+	help="Specifies the location of the vault to use.")
+vault_options.add_argument("-vt", "--vtapi", 
+	dest="vtapikey", 
+	required=True,
+	help="Provides the public key to use the API of VirusTotal.")	
 #//////////////////////////////////////////////////////////
 
 def banner():
@@ -59,10 +82,10 @@ def banner():
     License v3 for more information. 
     """)
 
-def main():
+def main(args):
 	shell = Shell()
-	shell.start()
+	shell.start(_base = args.base)
 
 if __name__ == "__main__":
 	banner()
-	main()
+	main(parser.parse_args())
