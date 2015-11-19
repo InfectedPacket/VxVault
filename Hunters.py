@@ -49,7 +49,7 @@ from BeautifulSoup import BeautifulSoup
 #//////////////////////////////////////////////////////////
 # Globals and Constants
 ERR_INVALID_DEST_DIR	=	"Invalid directory: '{:s}'."
-ERR_FAILED_PARSE_MALCODE=	"Failed to parse MalC0de feed : '{s}'."
+ERR_FAILED_PARSE_MALCODE=	"Failed to parse MalC0de feed : '{:s}'."
 ERR_FAILED_DOWNLOAD		=	"Failed to download file '{:s}': {:s}"
 MSG_INFO_DOWNLOADING	=	"Downloading {:s} from {:s}."
 ERR_FILE_NO_CONTENTS	=	"No contents found in '{:s}'."
@@ -63,7 +63,8 @@ MSG_INFO_NEXT_RUN		=	"Next run: {:%H:%M:%S}"
 # Classes
 class Hunter(threading.Thread):
 
-	DefaultHuntInterval = 60
+	DefaultHuntWait = 1
+	DefaultHuntInterval = 3600
 	HuntedExtensions = ["exe", "scr", "doc", "pdf", "apk", "jar", "docx", "zip"]
 
 	def __init__(self, _pit, _extensions = HuntedExtensions, _logger=None):
@@ -92,31 +93,40 @@ class Hunter(threading.Thread):
 		while (self.is_hunting):
 			new_targets = self.get_new_urls_since(datetime.now())
 			for vx_url in new_targets:
+				vx_url = urllib.unquote(vx_url).decode('utf8') 
 				vx_src_file = vx_url.split("/")[-1]						
 				vx_in_pit = [ f for f in os.listdir(self.pit) if os.path.isfile(f) ]
 				if (not vx_src_file in vx_in_pit):
 					vx_dst_file = os.path.join(self.pit, vx_src_file)
+					if "?" in vx_src_file:
+						vx_request = vx_dst_file.split("?")
+						vx_dst_file = vx_request[0]
+
 					self.logger.print_info(MSG_INFO_DOWNLOADING.format(vx_src_file, vx_url))
 					try:
 						urllib.urlretrieve (vx_url, vx_dst_file)
 					except Exception as e:
 						self.logger.print_error(ERR_FAILED_DOWNLOAD.format(vx_src_file, e.message))
-						
+				else:
+					self.logger.print_info("File '{:s}' already exists in pit.".format(vx_src_file))
 			self.next_hunt = datetime.now() + timedelta(seconds=Hunter.DefaultHuntInterval)
 			self.logger.print_info(MSG_INFO_NEXT_RUN.format(self.next_hunt))
-			#DEBUG:
-			self.is_hunting = False
-			time.sleep(Hunter.DefaultHuntInterval)
 			
-		self.logger.print_warning("Hunt completed. Thread is terminated.")
+			while (datetime.now() < self.next_hunt and self.is_hunting):
+				if self.is_hunting == True:
+					time.sleep(Hunter.DefaultHuntWait)
+			
+		self.logger.print_warning("Hunt completed. Thread '{:s}' is terminated.".format(self.name))
 		
 class MalcodeHunter(Hunter):
 
+	THREAD_NAME = "vx-hunter-malcode"
 	URL = 'http://malc0de.com/rss/'
 	URL_MARKER = "URL:"
 	
-	def __init__(self, _pit, _extensions = [], _logger=None):
+	def __init__(self, _pit, _extensions = Hunter.HuntedExtensions, _logger=None):
 		super(MalcodeHunter, self).__init__(_pit, _extensions, _logger)	
+		self.name=MalcodeHunter.THREAD_NAME
 		self.last_entry = ""
 	
 	def get_new_urls_since(self, _date, _max=150):
@@ -124,35 +134,49 @@ class MalcodeHunter(Hunter):
 		
 		self.logger.print_info(MSG_INFO_CONNECTING.format(MalcodeHunter.URL))
 		malcode_rss = feedparser.parse(MalcodeHunter.URL)
-		nb_entries = len(malcode_rss.entries)
-		self.logger.print_info(MSG_INFO_NB_ENTRIES.format(nb_entries))				
-		if (nb_entries > _max):
-			nb_entries = _max
-			self.logger.print_warning(MSG_WARN_NB_ENTRIES.format(nb_entries))
-		
-		for i in range(0, nb_entries):
-			post = malcode_rss.entries[i]
-			#if (post == self.last_entry):
-			#	break
-			#self.last_entry = post
-			
-			desc = post.summary
-			
-			desc_items = desc.split(",")
-			if (len(desc_items) == 5):
-				if (MalcodeHunter.URL_MARKER in desc_items[0]):
-					vx_url = "http://{:s}".format(desc_items[0].split(":")[1].strip())
-											
-					vx_file = vx_url.split("/")[-1]						
-					vx_ext = vx_file.split('.')[-1]
-					if (len(vx_ext) > 5):
-						vx_ext = ""
+		#nb_entries = len(malcode_rss.entries)
 
-					if (vx_ext in self.extensions):
-						urls.append(vx_url)
-			else:
-				raise Exception(ERR_FAILED_PARSE_MALCODE.format(desc))
+		nb_entries = 0
+		while (self.last_entry != malcode_rss.entries[nb_entries] and nb_entries < _max):
+			nb_entries += 1
+				
+		self.logger.print_debug("New entries found: {:d}.".format(nb_entries))
+		if (nb_entries > 0):
+			self.logger.print_info("{:d} new entry(ies) found on malcode.".format(nb_entries))
+			self.last_entry = malcode_rss.entries[0]
+			
+			for i in range(0, nb_entries):
+				desc = malcode_rss.entries[i].summary
+				
+				desc_items = desc.split(",")
+				url_data = desc_items[0]
+				self.logger.print_debug("New url found: '{:s}'.".format(url_data))
+				if (len(desc_items) == 5):
+					if (MalcodeHunter.URL_MARKER in url_data):
+						if (":" in url_data):
+							url_data = url_data.split(":")[1]
+						url_data = url_data.strip()
+						
+						if (len(url_data) > 0):
+							vx_url = u'http://{:s}'.format(url_data)
+													
+							vx_file = vx_url.split("/")[-1]						
+							vx_ext = vx_file.split('.')[-1]
+							if (len(vx_ext) > 5):
+								vx_ext = ""
 
+							if (vx_ext in self.extensions):
+								self.logger.print_debug("\tNew: {:s}.".format(vx_url))
+								urls.append(vx_url)
+							else:
+								self.logger.print_debug("Ignoring url. Extension '{:s}' is not in download list.".format(vx_ext))
+					else:
+						self.logger.print_warning("Could not find URL in post: \n{:s}".format(desc))
+				else:
+					#raise Exception(ERR_FAILED_PARSE_MALCODE.format(desc))
+					self.logger.print_warning(ERR_FAILED_PARSE_MALCODE.format(desc))
+		else:
+			self.logger.print_warning("No new entries found on malcode.")
 		return urls	
 	
 
