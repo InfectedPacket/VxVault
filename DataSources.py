@@ -172,9 +172,9 @@ class VirusTotalSource(DataSource):
 	PARAM_APIKEY = "apikey"
 	URL_VT_REPORT = "https://www.virustotal.com/vtapi/v2/file/report"
 
-	def __init__(self, _api=PARAM_APIKEY):
+	def __init__(self, _apikey):
 		super(VirusTotalSource, self).__init__(VirusTotalSource.URL_VT_REPORT)
-		self.add_parameter(VirusTotalSource.PARAM_APIKEY, _api)
+		self.add_parameter(VirusTotalSource.PARAM_APIKEY, _apikey)
 
 	def retrieve_metadata(self, _vx):
 		if (_vx):
