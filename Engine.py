@@ -58,8 +58,6 @@ ENGINE_ERROR_ARCHIVER_404	=	"Could not find archiving program: {:s}."
 ENGINE_ERROR_UNKNOWN_TYPE	=	"Unknown file type: {:s}."
 ENGINE_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
 
-VT_KEY	=	"7eecda5aafd0ad150e087e9868385540d96354560bd6a51b29c6f0f32a7ef025"
-
 DS_VIRUS_TOTAL = "VirusTotal"
 
 DEFAULT_DATA_SOURCE = DS_VIRUS_TOTAL
@@ -68,13 +66,13 @@ DEFAULT_DATA_SOURCE = DS_VIRUS_TOTAL
 
 class Engine(object):
 
-	def __init__(self, _logger=None):
+	def __init__(self, _base, _vtapi, _logger=None):
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger
 		self.data_sources = {}
-		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(VT_KEY)
-		
-		self.vxvault = None
+		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(_vtapi)
+		self.active_hunters = []
+		self.vxvault = Vault(_base, self.logger)
 		
 	def __repr__(self):
 		return "<VxVault Engine {:s}>".format(__version__)
@@ -139,3 +137,21 @@ class Engine(object):
 			_password, 
 			compression_program)
 		return vx_archive		
+		
+	def gather_vx_from_malcode(self):
+		vx_pit = self.vxvault.get_pit()
+		vx_hunter = MalcodeHunter(_pit=vx_pit, _logger=self.logger)
+		self.active_hunters.append(vx_hunter)
+		vx_hunter.start()
+		
+	def gather_vx_from_local_files(self, _datadir):
+		vx_pit = self.vxvault.get_pit()
+		vx_hunter = LocalHunter(_pit=vx_pit, _dir=_datadir, _logger=self.logger)
+		self.active_hunters.append(vx_hunter)
+		vx_hunter.start()
+		
+	def stop_hunters(self):
+		for vx_hunter in self.active_hunters:
+			vx_hunter.stop_hunting()
+			vx_hunter.join()
+			
