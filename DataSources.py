@@ -43,6 +43,7 @@ import os.path
 import shutil
 import simplejson
 import feedparser
+from datetime import datetime, timedelta
 
 from Logger import Logger
 from Virus import Virus
@@ -86,38 +87,8 @@ AV_BAIDU		=	"Baidu-International"
 #//////////////////////////////////////////////////////////
 # Classes
 
-class Analyzer(threading.Thread):
 
-	def __init__(self, _pit, _logger=None):
-		threading.Thread.__init__(self)
-		if _logger == None: self.logger = Logger(sys.stdout)
-		else: self.logger = _logger
-		
-		if (_pit and os.path.isdir(_pit)):
-			self.pit = _pit
-		else:
-			raise Exception(ERR_INVALID_DEST_DIR.format(_dst))
-		
-	def stop_analysis():
-		self.analyze = False
-		
-	def run(self):
-	
-		vt_source = VirusTotalSource()
-	
-		while (self.analyze):
-			vx_in_pit = [ os.path.join(self.pit, f) for f in os.listdir(self.pit) if os.path.isfile(os.path.join(self.pit, f)) ]
-			if (len(vx_in_pit) > 0):
-				for vx_file in vx_in_pit:
-					self.logger.print_info(MSG_INFO_ANALYZING.format(vx_file))
-					vx = Virus()
-					vx.add_file(vx_file)
-					vx_data = vt_source.retrieve_metadata(vx)
-					
-			time.delay(300)
-	
-
-class DataSource(object):
+class VxDataSource(object):
 	__metaclass__ = abc.ABCMeta
 	
 	def __init__(self, _source, _parameters = {}):
@@ -152,21 +123,15 @@ class DataSource(object):
 		return self.parameters
 
 	@abc.abstractmethod
-	def retrieve_metadata(self, _vx):
+	def get_next_allowed_request(self):
 		return
-
 		
-class OnlineSource(DataSource):
-	__metaclass__ = abc.ABCMeta
-	
-	def __init__(self, _source, _parameters = {}):
-		super(OnlineSource, self).__init__(_source, parameters)
-	
 	@abc.abstractmethod
 	def retrieve_metadata(self, _vx):
 		return
-	
-class VirusTotalSource(DataSource):
+
+
+class VirusTotalSource(VxDataSource):
 
 	PARAM_RSRC = "resource"
 	PARAM_APIKEY = "apikey"
@@ -176,6 +141,10 @@ class VirusTotalSource(DataSource):
 		super(VirusTotalSource, self).__init__(VirusTotalSource.URL_VT_REPORT)
 		self.add_parameter(VirusTotalSource.PARAM_APIKEY, _apikey)
 
+	def get_next_allowed_request(self):
+		delay = 15 # 4 request/minutes allowed on VT
+		return datetime.now() + timedelta(seconds=delay+2)
+		
 	def retrieve_metadata(self, _vx):
 		if (_vx):
 			vx_files = _vx.get_files()
@@ -197,4 +166,4 @@ class VirusTotalSource(DataSource):
 					scans[scan] = vx_scans[scan][u'result']
 					#print("{:s}:{:s}".format(scan, vx_scans[scan][u'result']))
 				_vx.set_antiviral_results(scans)
-				
+			

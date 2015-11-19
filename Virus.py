@@ -200,7 +200,7 @@ class Virus(object):
 		detected = False
 		if (len(av_results) > 0):
 			if _av in av_results:
-				return av_results[_av].detected
+				return av_results[_av] != "None"
 		return detected
 	
 	def get_detection_by(self, _av):
@@ -208,7 +208,7 @@ class Virus(object):
 		detected = False
 		if (len(av_results) > 0):
 			if _av in av_results:
-				return av_results[_av].result
+				return av_results[_av]
 		return detected	
 	
 	def archive(self, _destination, _password, _7z):

@@ -70,6 +70,11 @@ vault_options.add_argument("-vt", "--vtapi",
 	dest="vtapikey", 
 	required=True,
 	help="Provides the public key to use the API of VirusTotal.")	
+vault_options.add_argument("-d", "--debug", 
+	dest="debug", 
+	action="store_true",
+	default=False,
+	help="Provides the public key to use the API of VirusTotal.")	
 #//////////////////////////////////////////////////////////
 
 def banner():
@@ -83,8 +88,9 @@ def banner():
     """)
 
 def main(args):
-	shell = Shell()
-	shell.start(_base = args.base)
+	shell = Shell(_debug=args.debug)
+	shell.start(_base = args.base, 
+				_vtapi=args.vtapikey)
 
 if __name__ == "__main__":
 	banner()

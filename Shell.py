@@ -119,13 +119,15 @@ class ShellConfig:
 
 class Shell(object):
 	
-	def __init__(self, _output=sys.stdout):
+	def __init__(self, _debug=False, _output=sys.stdout):
 		"""
 			Initializes the user interface by defining a Logger object
 			and defining the standard output.
 		"""
 		self.output = _output
-		self.logger = Logger(_output, _debug=True)
+		self.logger = Logger(_output=_output, _debug=_debug)
+		if (_debug):
+			self.logger.print_debug("Debug mode: ON")
 		
 	def start(self, _base, _vtapi):
 		"""
@@ -134,7 +136,7 @@ class Shell(object):
 		
 		# Command entered by the user
 		cmd = ""
-		engine = Engine(_base, _vtapi)
+		engine = Engine(_base, _vtapi, _logger=self.logger)
 		self.logger.print_info("Type 'help' to show a list of available commands.")
 		
 		while (cmd.lower() != ShellConfig.CMD_QUIT):
@@ -147,6 +149,7 @@ class Shell(object):
 					cmd = tokens[0]
 				if (cmd.lower() == ShellConfig.CMD_QUIT):
 					engine.stop_hunters()
+					engine.stop_analyzers()
 				elif (cmd.lower() == ShellConfig.CMD_HELP):
 					if (len(tokens) == 1):
 						self.logger.print_info("{:s} <property> <value>".format(ShellConfig.CMD_SET))
@@ -155,6 +158,7 @@ class Shell(object):
 						self.logger.print_info("{:s} <base-directory>".format(ShellConfig.CMD_NEWFAULT))
 						self.logger.print_info("{:s} <command>".format(ShellConfig.CMD_HELP))
 						self.logger.print_info("{:s}".format(ShellConfig.CMD_QUIT))
+						self.logger.print_info("{:s} malcode|(local <directory>|stopall)".format(ShellConfig.CMD_HUNT))
 					else:
 						param = tokens[1]
 						if ((param in ShellConfig.commands.keys())):
@@ -215,30 +219,24 @@ class Shell(object):
 					else:
 						self.logger.print_info("{:s} <file|directory>".format(ShellConfig.CMD_NEWVX))
 				elif (cmd.lower() == ShellConfig.CMD_HUNT):
-					if len(tokens) >= 3:
-						vx_pit = tokens[-1]
+					if len(tokens) >= 2:
 						if (tokens[1] == "malcode"):
 							engine.gather_vx_from_malcode()
+							engine.start_vt_analyzer()
 						elif (tokens[1] == "local"):
 							vx_local = tokens[2]
 							engine.gather_vx_from_local_files(vx_local)
+							engine.start_vt_analyzer()
+						elif (tokens[1] == "stopall"):
+							engine.stop_hunters()
+							engine.stop_analyzers()
 						else:
 							self.logger.print_error("Unknown option for '{:s}': {:s}".format(tokens[1], ShellConfig.CMD_HUNT))
 					else:
-						self.logger.print_error("{:s} malcode|(local <directory>) <pit>".format(ShellConfig.CMD_HUNT))
+						self.logger.print_error("{:s} malcode|(local <directory>|stopall)".format(ShellConfig.CMD_HUNT))
 			
 				elif (cmd.lower() == ShellConfig.CMD_TEST):		
-					pit = "C:\\vx\\warning\\biohazard"
-					vx_in_pit = [ os.path.join(pit, f) for f in os.listdir(pit) if os.path.isfile(os.path.join(pit, f)) ]
-					vt_source = VirusTotalSource()
-					if (len(vx_in_pit) > 0):
-						vx_file = vx_in_pit[0]
-						vx = Virus()
-						vx.add_file(vx_file)
-						vx_file = vx.get_files()[0]
-						print("MD5:" + vx.md5()[vx_file])
-						#vx_data = vt_source.retrieve_metadata(vx)
-						#print(vx_data)
+					engine.start_vt_analyzer()
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:

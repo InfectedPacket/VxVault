@@ -49,6 +49,8 @@ from Vault import Vault
 from Virus import Virus
 from Logger import Logger
 from DataSources import *
+from Hunters import *
+from Analyzers import *
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
@@ -66,12 +68,15 @@ DEFAULT_DATA_SOURCE = DS_VIRUS_TOTAL
 
 class Engine(object):
 
+	MaxActiveAnalyzers = 1
+
 	def __init__(self, _base, _vtapi, _logger=None):
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger
 		self.data_sources = {}
 		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(_vtapi)
 		self.active_hunters = []
+		self.active_analyzers = []
 		self.vxvault = Vault(_base, self.logger)
 		
 	def __repr__(self):
@@ -150,8 +155,25 @@ class Engine(object):
 		self.active_hunters.append(vx_hunter)
 		vx_hunter.start()
 		
+	def active_analyzers_count(self):
+		return len(self.active_analyzers)
+		
+	def start_vt_analyzer(self):
+		if (len(self.active_analyzers) < Engine.MaxActiveAnalyzers):
+			vx_pit = self.vxvault.get_pit()
+			vx_data_source = self.data_sources[DS_VIRUS_TOTAL]
+			vx_analyzer = Analyzer(_vxdata=vx_data_source, _pit=vx_pit, _logger=self.logger)
+			self.active_analyzers.append(vx_analyzer)
+			vx_analyzer.start()
+		else:
+			self.logger.print_warning("Maximum of analyzers reached.")
+		
 	def stop_hunters(self):
 		for vx_hunter in self.active_hunters:
 			vx_hunter.stop_hunting()
 			vx_hunter.join()
 			
+	def stop_analyzers(self):
+		for vx_analyzer in self.active_analyzers:
+			vx_analyzer.stop_analysis()
+			vx_analyzer.join()
