@@ -37,14 +37,41 @@ import sys
 import hashlib
 import traceback
 
+from parse import *
 from Logger import Logger
+from operator import itemgetter
 #//////////////////////////////////////////////////////////
 
 VIRUS_ERROR_7Z_NOTFOUND = "Could not find archiving program: {:s}."
 
 class Virus(object):
 
+	UNKNOWN			= "Unknown"
+
+	AV_ADAWARE		=	"Ad-Aware"
+	AV_AVAST		=	"Avast"
+	AV_AVG			=	"AVG"
+	AV_AVIRA		=	"Avira"
+	AV_BITDEFENDER	=	"BitDefender"
+	AV_CLAM			=	"ClamAV"
+	AV_FORTINET		=	"Fortinet"
+	AV_COMODO		=	"Comodo"
+	AV_FSECURE		=	"F-Secure"
+	AV_GDATA		=	"GData"
+	AV_MALBYTES		=	"MalwareBytes"
+	AV_MCAFEE		=	"McAfee"
+	AV_PANDA		=	"Panda"
+	AV_SOPHOS		=	"Sophos"
+	AV_ESET			=	"ESET"
+	AV_SYMANTEC		=	"Symantec"
+	AV_TENCENT		=	"Tencent"
+	AV_TRENDMICRO	=	"Trend Micro"
+	AV_MICROSOFT	=	"Microsoft"
+	AV_KASPERSKY	=	"Kaspersky"
+	AV_BAIDU		=	"Baidu-International"
+
 	VX_CLASS_VIRUS 		= "Virus"
+	VX_CLASS_ADWARE		= "Adware"
 	VX_CLASS_WORM		= "Worm"
 	VX_CLASS_TROJAN 	= "Trojan"
 	VX_CLASS_ROOTKIT	= "Rootkit"
@@ -55,12 +82,22 @@ class Virus(object):
 	VX_CLASS_BACKDOOR	= "Backdoor"
 	VX_CLASS_KEYLOGGER	= "Keylogger"
 	VX_CLASS_OTHER		= "Other"
-	VX_CLASS_UNKNOWN	= "Unknown"
+	VX_CLASS_UNKNOWN	= UNKNOWN
 
-	UNKNOWN			= "Unknown"
+	VX_OS_DOS			= "DOS"
+	VX_OS_WIN16			= "Win16"
+	VX_OS_WIN32			= "Win32"
+	VX_OS_WIN64			= "Win64"
+	VX_OS_LINUX_32		= "Linux32"
+	VX_OS_LINUX_64		= "Linux64"
+	VX_OS_ANDROID		= "Android"
+	VX_OS_MACOS			= "MacOS"
+	VX_OS_WEB			= "Web"
+	VX_OS_ANY			= "Any"
+	
 	DEFAULT_VX_NAME 	= UNKNOWN
 	DEFAULT_VX_SIZE		= 0
-	DEFAULT_VX_VERS 	= "1.00"
+	DEFAULT_VX_VERS 	= "A"
 	DEFAULT_VX_CLASS	= VX_CLASS_UNKNOWN
 	DEFAULT_VX_DATE		= "1900"
 	DEFAULT_VX_COUNTRY	= UNKNOWN
@@ -84,6 +121,7 @@ class Virus(object):
 
 	VirusClasses = [
 		VX_CLASS_VIRUS,
+		VX_CLASS_ADWARE,
 		VX_CLASS_WORM,
 		VX_CLASS_TROJAN,
 		VX_CLASS_ROOTKIT,
@@ -94,9 +132,69 @@ class Virus(object):
 		VX_CLASS_BACKDOOR,
 		VX_CLASS_KEYLOGGER
 	]
-		
 	
-	def __init__(self):
+	OperatingSystems = [
+		VX_OS_DOS,
+		VX_OS_WIN16,
+		VX_OS_WIN32,
+		VX_OS_WIN64,
+		VX_OS_LINUX_32,
+		VX_OS_LINUX_64,
+		VX_OS_ANDROID,
+		VX_OS_MACOS,
+		VX_OS_WEB,
+		VX_OS_ANY
+	]
+	
+	VirusIdentItems = [
+		VX_PROPERTY_NAME,
+		VX_PROPERTY_OS,
+		VX_PROPERTY_CLASS,
+		VX_PROPERTY_VERS
+	]
+	
+	AvNameFormats = {
+		AV_ADAWARE		:	"{}:{}.{name}.{variant}",
+		AV_AVAST		:	"{os}:{name}",
+		AV_AVG			:	"{name}.{variant}",
+		AV_AVIRA		:	"{}/{name}.{variant}.{}",
+		AV_BITDEFENDER	:	"{}:{}.{name}.{variant}",
+		AV_CLAM			:	"{os}.{class}.{name}",
+		AV_FORTINET		:	"{class}/{name}",
+		AV_COMODO		:	"{class}.{os}.{name}.{variant}",
+		AV_FSECURE		:	"{}:{}.{name}.{variant}",
+		AV_GDATA		:	"{}:{}.{name}.{variant}",
+		AV_MALBYTES		:	"MalwareBytes",
+		AV_MCAFEE		:	"{name}!{variant}",
+		AV_PANDA		:	"Panda",
+		AV_SOPHOS		:	"{class}:{name}",
+		AV_ESET			:	"ESET-NOD32",
+		AV_SYMANTEC		:	"{class}.{name}.{variant}",
+		AV_TENCENT		:	"{os}.{class}.{name}.{variant}",
+		AV_TRENDMICRO	:	"{class}.{name}",
+		AV_MICROSOFT	:	"Microsoft",
+		AV_KASPERSKY	:	"{class}.{os}.{name}.{variant}",
+		AV_BAIDU		:	"{class}.{os}.{name}.{variant}"
+	}
+		
+	NormalizedLabels = {
+		"dos"	:	VX_OS_DOS,
+		"msdos"	:	VX_OS_DOS,
+		"w16"	:	VX_OS_WIN16,
+		"win16"	:	VX_OS_WIN16,	
+		"w32"	:	VX_OS_WIN32,
+		"win32"	:	VX_OS_WIN32,
+		"w64"	:	VX_OS_WIN32,
+		"win64"	:	VX_OS_WIN32,
+		"troj"	: 	VX_CLASS_TROJAN,
+		"troj_gen"		: 	VX_CLASS_TROJAN,
+		"trojan-spy"	: 	VX_CLASS_SPYWARE,
+		"trojware"		: 	VX_CLASS_TROJAN
+	}
+	
+	def __init__(self, _logger=None):
+		if _logger == None: self.logger = Logger(sys.stdout)
+		else: self.logger = _logger		
 		self.files = []
 		self.properties = {}
 		self.properties[Virus.VX_PROPERTY_NAME] = Virus.DEFAULT_VX_NAME
@@ -111,6 +209,7 @@ class Virus(object):
 		self.properties[Virus.VX_PROPERTY_SHA1] = {}
 		self.properties[Virus.VX_PROPERTY_SHA256] = {}
 		self.properties[Virus.VX_PROPERTY_SSDEEP] = {}
+		self.idents = {}
 
 	def __repr__(self):
 		vx_id = self.get_name()
@@ -133,6 +232,10 @@ class Virus(object):
 	def add_file(self, _file):
 		self.files.append(_file)
 
+	def add_ident(self, _av, _ident):
+		if (len(_av) > 0 and len(_ident) > 0 and _ident.lower().trim() != "none"):
+			self.idents[_av] = _ident
+		
 	def get_archive(self):
 		return self.get_property(Virus.VX_PROPERTY_ARCHIVE)
 
@@ -190,26 +293,86 @@ class Virus(object):
 		return self.properties[Virus.VX_PROPERTY_DATE]
 
 	def set_antiviral_results(self, _detections = {}):
-		self.set_property(Virus.VX_PROPERTY_DETECT, _detections)
+		self.idents = _detections
 		
 	def get_antiviral_results(self):
-		return self.get_property(Virus.VX_PROPERTY_DETECT)
+		return self.idents
 	
 	def is_detected_by(self, _av):
-		av_results = self.get_antiviral_results()
-		detected = False
-		if (len(av_results) > 0):
-			if _av in av_results:
-				return av_results[_av] != "None"
-		return detected
+		if (self.idents and len(self.idents) > 0):
+			return (_av in self.idents)
+		return False
 	
 	def get_detection_by(self, _av):
-		av_results = self.get_antiviral_results()
-		detected = False
-		if (len(av_results) > 0):
-			if _av in av_results:
-				return av_results[_av]
-		return detected	
+		if (self.idents and len(self.idents) > 0):
+			if (self.is_detected_by(_av)):
+				return self.idents[_av]
+		return None
+	
+	def _create_archive_filename(self):
+		self.logger.print_debug("Generating archive name...")
+		filename_fmt = "{vxclass:s}.{vxos:s}.{vxname:s}.{vxvariant:s}"
+		vx_class = self.get_class()
+		vx_os = self.get_os()
+		vx_name = self.get_name()
+		vx_variant = self.get_version()
+		
+		if (vx_class == Virus.UNKNOWN):
+			vx_class = self._guess_property_from_scans(Virus.VX_PROPERTY_CLASS)
+			if (vx_class in Virus.NormalizedLabels):
+				vx_class = Virus.NormalizedLabels[vx_class.lower()]
+			self.set_class(vx_class)
+			
+		if (vx_os == Virus.UNKNOWN):
+			vx_os = self._guess_property_from_scans(Virus.VX_PROPERTY_OS)
+			if (vx_os in Virus.NormalizedLabels):
+				vx_os = Virus.NormalizedLabels[vx_os.lower()]
+			self.set_os(vx_os)
+			
+		if (vx_name == Virus.UNKNOWN):
+			vx_name = self._guess_property_from_scans(Virus.VX_PROPERTY_NAME)
+			self.set_name(vx_name)
+			
+		if (vx_variant == Virus.UNKNOWN):
+			vx_variant = self._guess_property_from_scans(Virus.VX_PROPERTY_VERS)
+			self.set_version(vx_variant)
+			
+		archive_name = filename_fmt.format(vxclass=vx_class,
+			vxos=vx_os, vxname=vx_name, vxvariant=vx_variant)
+		return archive_name
+	
+	def _guess_property_from_scans(self, _property):
+		self.logger.print_debug("Generating value for property '{:s}'.".format(_property))
+		if (_property in Virus.VirusIdentItems):
+			if (len(self.idents) > 0):
+				if (self.is_detected_by(Virus.AV_KASPERSKY)):
+					name_fmt = Virus.AvNameFormats[Virus.AV_KASPERSKY]
+					id_items = parse(name_fmt, self.get_detection_by(Virus.AV_KASPERSKY))
+					self.logger.print_debug("Value for '{:s}' found in Kaspersky ident: {:s}".format(_property, id_items[_property]))
+					return id_items[_property]
+				elif (self.is_detected_by(Virus.AV_TENCENT)):
+					name_fmt = Virus.AvNameFormats[Virus.AV_TENCENT]
+					id_items = parse(name_fmt, self.get_detection_by(Virus.AV_TENCENT))
+					self.logger.print_debug("Value for '{:s}' found in Tencent ident: {:s}".format(_property, id_items[_property]))
+					return id_items[_property]
+				else:
+					scoreboard = {}
+					for (av, name_fmt) in Virus.AvNameFormats.items():
+						id_items = parse(name_fmt, self.get_detection_by(av))
+						if (_property in id_items):
+							property_value = id_items[_property]
+							if (property_value in scoreboard):
+								scoreboard[property_value] += 1
+							else:
+								scoreboard[property_value] = 1
+					max_value = max(scoreboard.values())
+					best_value = [prop for prop,val in scoreboard.items() if val == max_value]
+					self.logger.print_debug("Best value for '{:s}' found with score '{:d}': {:s}".format(_property, max_value, best_value[0]))
+					return best_value[0]
+			else:
+				raise Exception("No malware infomation available.")
+		else:
+			raise Exception("Unknown property")
 	
 	def archive(self, _destination, _password, _7z):
 		if (self.files and len(self.files) > 0):

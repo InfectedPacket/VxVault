@@ -32,6 +32,7 @@
 
 #//////////////////////////////////////////////////////////
 # Imports Statements
+import re
 import shutil
 import os.path
 import threading
@@ -51,7 +52,7 @@ MSG_INFO_ANALYZING		=	"Analyzing '{:s}' ..."
 class Analyzer(threading.Thread):
 
 	DefaultWaitDelay = 3
-
+	
 	def __init__(self, _vxdata, _pit, _logger=None):
 		threading.Thread.__init__(self)
 		self.name = "vx_pit_analyzer"
@@ -87,28 +88,11 @@ class Analyzer(threading.Thread):
 						vxdata = vx.get_antiviral_results()
 						
 						if (vxdata and len(vxdata) > 0):
-							print(vxdata)
 							self.logger.print_debug("File:{:s}:".format(vx_file))
 							for (av, detection) in vxdata.iteritems():
-								self.logger.print_debug("\t{:s}:{:s}".format(av, detection))
-								if (detection != "None"):
-									vx_dst_file = detection
-							
-							if (len(vx_dst_file) > 0):					
-								if vx.is_detected_by(AV_KASPERSKY):
-									vx_dst_file = vx.get_detection_by(AV_KASPERSKY)
-								elif vx.is_detected_by(AV_BAIDU):
-									vx_dst_file = vx.get_detection_by(AV_BAIDU)
-								elif vx.is_detected_by(AV_CLAM):
-									vx_dst_file = vx.get_detection_by(AV_CLAM)
-								elif vx.is_detected_by(AV_SYMANTEC):
-									vx_dst_file = vx.get_detection_by(AV_SYMANTEC)
-								#TODO: move file
-								self.logger.print_debug("Saving malware as '{:s}'...".format(vx_dst_file))	
-							else:
-								self.logger.print_warning("No detection for file '{:s}'.".format(vx_file))
-							
-
+								if (detection.lower().trim() != "none"):
+									self.logger.print_debug("\t{:s}:{:s}".format(av, detection))
+									vx.add_ident(av, detection)
 						else:
 							self.logger.print_warning("No data retrieved for '{:s}'.".format(vx_file))
 					except Exception as e:
