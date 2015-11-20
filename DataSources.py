@@ -62,25 +62,6 @@ ERR_NULL_OR_EMPTY		=	"Value for variable '{:s}' cannot be null or empty."
 META_ERROR_INVALID_SRC	=	"Invalid source: '{:s}'."
 META_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
 
-AV_AVAST		=	"Avast"
-AV_AVG			=	"AVG"
-AV_AVIRA		=	"Avira"
-AV_BITDEFENDER	=	"BitDefender"
-AV_CLAM			=	"ClamAV"
-AV_FORTINET		=	"Fortinet"
-AV_COMODO		=	"Comodo"
-AV_FSECURE		=	"F-Secure"
-AV_GDATA		=	"GData"
-AV_MALBYTES		=	"MalwareBytes"
-AV_MCAFEE		=	"McAfee"
-AV_PANDA		=	"Panda"
-AV_SOPHOS		=	"Sophos"
-AV_ESET			=	"ESET"
-AV_SYMANTEC		=	"Symantec"
-AV_TRENDMICRO	=	"Trend Micro"
-AV_MICROSOFT	=	"Microsoft"
-AV_KASPERSKY	=	"Kaspersky"
-AV_BAIDU		=	"Baidu-International"
 
 #//////////////////////////////////////////////////////////
 
@@ -91,7 +72,9 @@ AV_BAIDU		=	"Baidu-International"
 class VxDataSource(object):
 	__metaclass__ = abc.ABCMeta
 	
-	def __init__(self, _source, _parameters = {}):
+	def __init__(self, _source, _parameters = {}, _logger=None):
+		if _logger == None: self.logger = Logger(sys.stdout)
+		else: self.logger = _logger
 		self.set_source(_source)
 		self.set_parameters(_parameters)
 			
@@ -137,8 +120,8 @@ class VirusTotalSource(VxDataSource):
 	PARAM_APIKEY = "apikey"
 	URL_VT_REPORT = "https://www.virustotal.com/vtapi/v2/file/report"
 
-	def __init__(self, _apikey):
-		super(VirusTotalSource, self).__init__(VirusTotalSource.URL_VT_REPORT)
+	def __init__(self, _apikey, _logger=None):
+		super(VirusTotalSource, self).__init__(VirusTotalSource.URL_VT_REPORT, _logger=_logger)
 		self.add_parameter(VirusTotalSource.PARAM_APIKEY, _apikey)
 
 	def get_next_allowed_request(self):
@@ -150,6 +133,7 @@ class VirusTotalSource(VxDataSource):
 			vx_files = _vx.get_files()
 			if (len(vx_files) > 0):
 				vx_md5 = _vx.md5()[vx_files[0]]
+				self.logger.print_debug("Retrieving report for '{:s}' ({:s}).".format(vx_files[0], vx_md5))
 				request_params = {VirusTotalSource.PARAM_RSRC: vx_md5, 
 									VirusTotalSource.PARAM_APIKEY: self.get_param_value(VirusTotalSource.PARAM_APIKEY)}
 				data = urllib.urlencode(request_params)
@@ -159,11 +143,12 @@ class VirusTotalSource(VxDataSource):
 				vx_data = simplejson.loads(json)
 				vx_scans = vx_data.get("scans", {})
 				if (vx_data.get("response_code", {}) != 1 or len(vx_scans) <= 0):
+					self.logger.print_error("Failed to retrieve scan information.")
 					raise Exception(META_ERROR_NO_METADATA.format(vx_files[0]))
-					
+				self.logger.print_success("Successfully retrieved report from VirusTotal.")
+				
 				scans = {}
 				for scan in vx_scans:
 					scans[scan] = vx_scans[scan][u'result']
-					#print("{:s}:{:s}".format(scan, vx_scans[scan][u'result']))
 				_vx.set_antiviral_results(scans)
 			
