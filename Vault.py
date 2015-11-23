@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: latin-1 -*-
-#█▀▀▀▀█▀▀▀▀▀██▀▀▀▀██▀▀▀▀▀▀ ▀▀▀▀▀▀▀▀▀▀▀▓▒▀▀▀▀▀▀▀▀▀▀█▓▀ ▀▀▀██▀▀▀▀▀▀▀▀▀▓▓▀▀▀▀▀▀▀▀▀▌
-#▌▄██▌ ▄▓██▄ ▀▄█▓▄▐ ▄▓█▓▓▀█ ▄▓██▀▓██▓▄ ▌▄█▓█▀███▓▄ ▌▄█▓█ ▀ ▄▓██▀▓██▓▄ ▄█▓█▀███▄■
+#//////////////////////////////////////////////////////////////////////////////
+#█▀▀▀▀█▀▀▀▀▀██▀▀▀▀██▀▀▀▀▀▀ ▀▀▀▀▀▀▀▀▀▀▀▓▒▀▀▀▀▀▀▀▀▀▀█▓▀ ▀▀▀██▀▀▀▀▀▀▀▀▀▓▓▀▀▀▀▀▀▀▀▀
+#▌▄██▌ ▄▓██▄ ▀▄█▓▄▐ ▄▓█▓▓▀█ ▄▓██▀▓██▓▄ ▌▄█▓█▀███▓▄ ▌▄█▓█ ▀ ▄▓██▀▓██▓▄ ▄█▓█▀███▄
 #▌▀▓█▓▐▓██▓▓█ ▐▓█▓▌▐▓███▌■ ▒▓██▌ ▓██▓▌▐▓▒█▌▄ ▓██▓▌ ▐▓▒█▌▐ ▒▓██▌  ▓██▓▌▓▒█▌ ▓█▓▌
-#▐▓▄▄▌░▓▓█▓▐▓▌ █▓▓▌░▓▓█▓▄▄ ▓▓██▓▄▄▓█▓▓▌░▓█▓ █ ▓█▓▓▌░▓█▓ ▒ ▓▓██▓▄▄▓█▓▓▌▓█▓ ░ ▓█▓▓
-#▐▓▓█▌▓▓▓█▌ █▓▐██▓▌▐▓▒▓▌ ▄ ▐░▓█▌▄ ▀▀▀ ▐▓▓▓ ▐▌ ▀▀▀  ▐▓▓▓▄▄ ▐░▓█▌ ▄ ▀▀▀ ▓▓▓ ░ ██▓▓
+#▐▓▄▄▌░▓▓█▓▐▓▌ █▓▓▌░▓▓█▓▄▄ ▓▓██▓▄▄▓█▓▓▌░▓█▓ █ ▓█▓▓▌░▓█▓ ▒ ▓▓██▓▄▄▓█▓▓▌▓█▓ ░ ▓█▓
+#▐▓▓█▌▓▓▓█▌ █▓▐██▓▌▐▓▒▓▌ ▄ ▐░▓█▌▄ ▀▀▀ ▐▓▓▓ ▐▌ ▀▀▀  ▐▓▓▓▄▄ ▐░▓█▌ ▄ ▀▀▀ ▓▓▓ ░ ██▓
 #▐▓▓▓█▐▓▒██ ██▓▓▓▌▐▓▓██  █▌▐▓▓▒▌▐ ███░▌▐▓▓▒▌▐ ███░▌ ▐▓▓▒▌ ▐▓▓▒▌▀ ███░▌▓▓▒▌ ███░
-# ▒▓▓█▌▒▓▓█▌ ▐▓█▒▒  ▒▓██▌▐█ ▒▓▓█ ▐█▓▒▒ ▒▒▓█  ▐█▓▒▒  ▒▒▓█ ▓▌▒▓▓█ ▐█▓▒▒ ▒▒▓█ ▐█▓▒▌
+# ▒▓▓█▌▒▓▓█▌ ▐▓█▒▒  ▒▓██▌▐█ ▒▓▓█ ▐█▓▒▒ ▒▒▓█  ▐█▓▒▒  ▒▒▓█ ▓▌▒▓▓█ ▐█▓▒▒ ▒▒▓█ ▐█▓▒
 #▌ ▒▒░▀ ▓▒▓▀  ▀░▒▓ ▐▌ ▓▓▓▀ █ █▒▓▀▀░█▓ ▄▌ ▒▒▓▀▀░█▓ ▄▌ ▒▒▓▀▀ █▒▓▀▀░█▓ ▒▒▓▀▀░█▀
 #█▄ ▀ ▄▄ ▀▄▄▀■ ▀ ▀▓█▄ ▀ ▄█▓█▄ ▀ ▓▄▄▄▄▄█▀ ▄▀ ▄▄▄▄▄▄█▓▄ ▀ ▄▄█▓▄▀ ▄▓▄█▄▀ ▄▄▄█▌
 #
@@ -29,46 +30,170 @@
 # <email>infectedpacket@gmail.com</email>
 # <date>2015-10-25</date>
 # <url>https://github.com/infectedpacket</url>
+#//////////////////////////////////////////////////////////////////////////////
 
-#//////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////////
 # Imports Statements
 import os
 import sys
+import shutil
 import os.path
+import platform
 
+from Virus import Virus
 from Logger import Logger
-#//////////////////////////////////////////////////////////
+from Archivers import SevenZipArchiver
+#//////////////////////////////////////////////////////////////////////////////
 
-#//////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////////
 # Constants
+ERR_FAILED_CREATE_DB = "Failed to create database file at '{:s}'."
+ERR_DIR_NOT_FOUND = "Could not find directory '{:s}'."
+ERR_DB_FILE_NOT_FOUND= "Could not find database file '{:s}'."
+ERR_INVALID_OS_CLASS = "Invalid or empty operating system/malware class provided."
 VAULT_ERROR_INVALID_BASE_DIR = "Invalid base directory: '{:s}'."
 
-#//////////////////////////////////////////////////////////
+INFO_NEW_BASE	=	"Relocated file system to '{:s}'."
+DEFAULT_ARCHIVE_PASSWORD = "infected"
+INFO_MOVING_FILE = "Moving file '{:s}' to '{:s}'."
+#//////////////////////////////////////////////////////////////////////////////
 
-#//////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////////
 # Classes
 class Vault(object):
 
-	
-	def __init__(self, _base, _name="", _logger=None):
+	# Password used to archive malware.
+	# TODO: 
+	#	[ ] User-provided from command line.
+	DefaultArchivePassword = DEFAULT_ARCHIVE_PASSWORD
+
+	def __init__(self, _base, _logger=None):
+		"""Initializes the Vault and the FileSystem objects.
+
+		Creates a new Vault object which is used to interface
+		with the file system of the operating system. 
+
+		Args:
+			_base: 
+				The directory in which the filesystem of the vault will
+				be created.
+			_name:
+				Optional name to identify the vault object.
+			_logger: 
+				Logger object to output information about program 
+				execution. If none provided, it will use sys.stdout
+				by default.
+
+		Returns:
+			None.
+
+		Raises:
+			None.
+		"""	
+		# Creates a new logger object.
 		if _logger == None: self.logger = Logger(sys.stdout)
-		self.set_name(str(_name))
-		self.file_system = FileSystem(_base)
+		else: self.logger = _logger
+		# Initialize the FileSystem object with the given
+		# base.
+		self.file_system = FileSystem(_base, _logger=_logger)
+		#
+		# Sets the archiver object for storing files in
+		# the vault.
+		#
+		archive_program = SevenZipArchiver(
+			_password = Vault.DefaultArchivePassword,
+			_logger = self.logger
+		)
+		self.set_archiver(archive_program)
 		
 	def __repr__(self):
 		return "<Vault '{:s}' @{:s}>".format(
 			self.get_name(), self.file_system.get_base())
 		
-	def set_name(self, _name):
-		self.name = str(_name)
+	def is_created(self):
+		"""Verifies if this vault has already been created
+		in the filesystem.
 
-	def get_name(self):
-		return self.name
+		This function will confirm if the vault has been created
+		on the file system.
+
+		Args:
+			None.
+
+		Returns:
+			True if the vault has been created in the configured base
+			directory provided at the creation of the engine. Returns 
+			False otherwie.
+
+		Raises:
+			None.
+		"""	
+		return self.file_system.filesystem_exists()
 		
 	def get_pit(self):
-		return self.file_system.get_pit()
+		"""Retrieves the absolute path of the SUBFOLDER_PIT
+		directory.
 
+		This function will retrieves the absolute path of the SUBFOLDER_PIT
+		directory.
+
+		Args:
+			None.
+
+		Returns:
+			Absolute path of the SUBFOLDER_PIT directory.
+
+		Raises:
+			None.
+		"""	
+		return self.file_system.get_pit()
+		
+	def archive_file(self, _vx):
+		""" Archives the files held in the given Virus object into
+		an archive in the Vault.
+
+		This function is a shortcut function to FileSystem.archive_file.
+
+		Args:
+			_vx: Virus object containing metadata about the malware.
+
+		Returns:
+			None.
+
+		Raises:
+			Exception if the provided Virus object is null.
+		"""	
+		self.file_system.archive_file(_vx)
+
+	def set_archiver(self, _archiver):
+		""" Sets the Archiver to be used by the Vault to archive and 
+		compress malware into the filesystem.
+
+		This function sets the Archiver to be used by the Vault to archive and 
+		compress malware into the filesystem.
+
+		Args:
+			_archiver: An Archiver object.
+
+		Returns:
+			None.
+
+		Raises:
+			Exception if the provided Virus object is null.
+		"""	
+		self.file_system.set_archiver(_archiver)
+		
 class FileSystem(object):
+
+	#**************************************************************************
+	# Name of the vault database file.
+	#**************************************************************************
+	VAULT_DB 			= ".vault.db"
+
+	#**************************************************************************
+	# Constants of operating systems used to create the
+	# file system.
+	#**************************************************************************
 	SUBFOLDER_WINDOWS 	= "win"
 	SUBFOLDER_MSDOS 	= "msdos"
 	SUBFOLDER_LINUX 	= "linux"
@@ -77,10 +202,16 @@ class FileSystem(object):
 	SUBFOLDER_ANDROID	= "android"
 	SUBFOLDER_WEB		= "web"
 	SUBFOLDER_ANY		= "any"
-	SUBFOLDER_OTHERS	= "pit"
+	SUBFOLDER_OTHERS	= "misc"
+	SUBFOLDER_PIT		= "pit"
 	
+	#**************************************************************************
+	# Constants of malware classes used to create the
+	# file system.
+	#**************************************************************************	
 	SUBFOLDER_VIRUS		= "virus"
 	SUBFOLDER_WORM		= "worm"
+	SUBFOLDER_ADWARE	= "adware"
 	SUBFOLDER_TROJAN	= "trojan"
 	SUBFOLDER_ROOTKIT	= "rootkit"
 	SUBFOLDER_EXPLOITKIT= "exploitkit"
@@ -88,7 +219,13 @@ class FileSystem(object):
 	SUBFOLDER_WEBSHELL	= "web"
 	SUBFOLDER_CRYPTER	= "crypter"
 	SUBFOLDER_SPYWARE	= "spyware"
+	SUBFOLDER_MISC		= "others"
+	SUBFOLDER_URLS		= "urls"
 	
+	#**************************************************************************
+	# List of operating systems used to create the
+	# file system.
+	#**************************************************************************	
 	OperatingSystems = [SUBFOLDER_WINDOWS,
 						SUBFOLDER_MSDOS,
 						SUBFOLDER_LINUX,
@@ -98,15 +235,37 @@ class FileSystem(object):
 						SUBFOLDER_WEB,
 						SUBFOLDER_ANY,
 						SUBFOLDER_OTHERS]
-	MsDosSubFolders = [SUBFOLDER_VIRUS,
+				
+	#**************************************************************************
+	# List of malware classes used to create the
+	# file system.
+	#**************************************************************************	
+	MalwareClasses = [SUBFOLDER_VIRUS,
 						SUBFOLDER_WORM,
-						SUBFOLDER_TROJAN]
-	LinuxSubFolders = MsDosSubFolders + [SUBFOLDER_ROOTKIT,SUBFOLDER_RAT,SUBFOLDER_SPYWARE]		
+						SUBFOLDER_ADWARE,
+						SUBFOLDER_TROJAN,
+						SUBFOLDER_ROOTKIT,
+						SUBFOLDER_EXPLOITKIT,
+						SUBFOLDER_RAT,
+						SUBFOLDER_WEBSHELL,
+						SUBFOLDER_CRYPTER,
+						SUBFOLDER_SPYWARE,
+						SUBFOLDER_MISC]
+					
+	#**************************************************************************
+	# Defines the subdirectories for each operating system
+	# directory.
+	#**************************************************************************	
+	MsDosSubFolders = [SUBFOLDER_VIRUS, SUBFOLDER_WORM, SUBFOLDER_TROJAN, SUBFOLDER_ROOTKIT]
+	LinuxSubFolders = MsDosSubFolders + [SUBFOLDER_RAT,SUBFOLDER_SPYWARE]		
 	WindowsSubFolders = LinuxSubFolders +[SUBFOLDER_CRYPTER,SUBFOLDER_EXPLOITKIT]
 	AndroidSubFolders = LinuxSubFolders +[SUBFOLDER_EXPLOITKIT]	
-	WebSubFolders = [SUBFOLDER_WEBSHELL,
-						SUBFOLDER_EXPLOITKIT]
+	WebSubFolders = [SUBFOLDER_WEBSHELL, SUBFOLDER_EXPLOITKIT]
+	OthersSubFolders = [SUBFOLDER_URLS]
 
+	#**************************************************************************
+	# Defines the structure of the  file system.
+	#**************************************************************************
 	FileStructure = {
 		SUBFOLDER_WINDOWS 	:	WindowsSubFolders,
 		SUBFOLDER_MSDOS 	:	MsDosSubFolders,
@@ -116,48 +275,368 @@ class FileSystem(object):
 		SUBFOLDER_ANDROID 	:	AndroidSubFolders,
 		SUBFOLDER_WEB		: 	WebSubFolders,
 		SUBFOLDER_ANY		: 	WindowsSubFolders,		
-		SUBFOLDER_OTHERS 	:	[],
+		SUBFOLDER_OTHERS 	:	OthersSubFolders,
+		SUBFOLDER_PIT 		:	[]
 	}
 
+	#**************************************************************************
+	# Dictionary to translate targeted operating system of
+	# malware to the corresponding directory in the file system.
+	#**************************************************************************
+	OsToFolder = {
+		Virus.VX_OS_DOS				: SUBFOLDER_MSDOS,
+		Virus.VX_OS_WIN16			: SUBFOLDER_WINDOWS,
+		Virus.VX_OS_WIN32			: SUBFOLDER_WINDOWS,
+		Virus.VX_OS_WIN64			: SUBFOLDER_WINDOWS,
+		Virus.VX_OS_LINUX_32		: SUBFOLDER_LINUX,
+		Virus.VX_OS_LINUX_64		: SUBFOLDER_LINUX,
+		Virus.VX_OS_ANDROID			: SUBFOLDER_ANDROID,
+		Virus.VX_OS_MACOS			: SUBFOLDER_OSX,
+		Virus.VX_OS_WEB				: SUBFOLDER_WEB,
+		Virus.VX_OS_ANY				: SUBFOLDER_ANY,
+	}
+	
+	#**************************************************************************
+	# Dictionary to translate class of
+	# malware to the corresponding directory in the file system.
+	#**************************************************************************
+	ClassToFolder = {
+		Virus.VX_CLASS_VIRUS 		: SUBFOLDER_VIRUS,
+		Virus.VX_CLASS_ADWARE		: SUBFOLDER_ADWARE,
+		Virus.VX_CLASS_WORM			: SUBFOLDER_WORM,
+		Virus.VX_CLASS_TROJAN 		: SUBFOLDER_TROJAN,
+		Virus.VX_CLASS_ROOTKIT		: SUBFOLDER_ROOTKIT,
+		Virus.VX_CLASS_EXPLOIT		: SUBFOLDER_EXPLOITKIT,
+		Virus.VX_CLASS_SPYWARE		: SUBFOLDER_SPYWARE,
+		Virus.VX_CLASS_WEBSHELL		: SUBFOLDER_WEBSHELL,
+		Virus.VX_CLASS_CRYPTER		: SUBFOLDER_CRYPTER,
+		Virus.VX_CLASS_BACKDOOR		: SUBFOLDER_ROOTKIT,
+		Virus.VX_CLASS_KEYLOGGER	: SUBFOLDER_SPYWARE,
+		Virus.VX_CLASS_OTHER		: SUBFOLDER_MISC
+	}
+	
 	def __init__(self, _base, _logger=None):
+		#**********************************************************************
+		# Creates a new logger object.
+		#**********************************************************************
 		if _logger == None: self.logger = Logger(sys.stdout)
+		else: self.logger = _logger
+		
+		#**********************************************************************
+		# Sets the base directory of the vault.
+		#**********************************************************************
 		self.set_base(_base)
+		
+		#**********************************************************************
+		# Specify the first level of directories to create in the base
+		# directory, i.e. list of operating systems.
+		#**********************************************************************
 		self.FileStructure[self.get_base()] = FileSystem.OperatingSystems
 		
 	def __repr__(self):
 		return "<Filesystem @{:s}>".format(self.get_base())
 		
 	def set_base(self, _base):
+		"""Sets the base directory of the vault on the underlying
+		file system.
+
+		This function sets the base directory of the vault on the underlying
+		file system. The first level of directories, i.e. directories
+		for operating systems, will be created in the folder provided 
+		in this function.
+
+		Args:
+			_base : a path indicating the location of the vault
+			and the vault database.
+
+		Returns:
+			None.
+
+		Raises:
+			Exception if the given base is invalid, i.e. not found or
+			is not a directory.
+		"""			
 		if not os.path.isdir(_base):
 			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(_base))
-		self.logger.print_success("Relocated file system to '{:s}'.".format(_base))
+		self.logger.print_debug(INFO_NEW_BASE.format(_base))
 		self.base = _base
 		
 	def get_base(self):
+		"""Returns the base directory of the vault on the underlying
+		file system.
+
+		This function returns the base directory of the vault on the underlying
+		file system. The first level of directories, i.e. directories
+		for operating systems, will be created in the folder provided 
+		in this function.
+
+		Args:
+			None.
+
+		Returns:
+			A path indicating the location of the vault
+			and the vault database.
+
+		Raises:
+			None.
+		"""			
 		return self.base
 	
+	def create_db_file(self):
+		db_file = self.get_db_file()
+		with open(db_file, "w") as f:
+			pass
+		if (not os.path.isfile(db_file)):
+			raise Exception(ERR_FAILED_CREATE_DB.format(db_file))
+	
+	def set_archiver(self, _archiver):
+		""" Sets the Archiver to be used by the Vault to archive and 
+		compress malware into the filesystem.
+
+		This function sets the Archiver to be used by the File system to 
+		archive and compress malware into the filesystem.
+
+		Args:
+			_archiver: An Archiver object.
+
+		Returns:
+			None.
+
+		Raises:
+			Exception if the provided Archiver object is null.
+		"""	
+		if (_archiver):
+			self.archiver = _archiver
+		else:
+			raise Exception("Archiver object cannot be null.")
+	
+	def get_db_file(self):
+		"""Returns the absolute path of the database file.
+
+		Returns the absolute path of the database file linked
+		to this vault object. 
+
+		Args:
+			None.
+
+		Returns:
+			The absolute path of the database file.
+
+		Raises:
+			None.
+		"""		
+		return os.path.join(self.get_base(), FileSystem.VAULT_DB)
+	
+	def get_pit(self):
+		"""Retrieves the absolute path of the SUBFOLDER_PIT
+		directory.
+
+		This function will retrieves the absolute path of the SUBFOLDER_PIT
+		directory.
+
+		Args:
+			None.
+
+		Returns:
+			Absolute path of the SUBFOLDER_PIT directory.
+
+		Raises:
+			None.
+		"""	
+		return os.path.join(self.get_base(), FileSystem.SUBFOLDER_PIT)
+	
+	def get_urls_dump(self):
+		return os.path.join(self.get_pit(), FileSystem.SUBFOLDER_URLS)
+	
+	def get_directory(self, _os, _class):
+		"""Finds the corresponding directory of the Vault based on the
+		provided operating system and malware class.
+
+		This function will leverage the FileSystem.OsToFolder and
+		FileSystem.ClassToFolder to find the folder corresponding
+		to the given properties. 
+
+		Args:
+			_os : Operating system.
+			_class: Malware class, i.e. Trojan, Rootkit, Worm etc...
+
+		Returns:
+			The absolute path corresponding to the given OS and class properties.
+
+		Raises:
+			Exception if provided arguments are null/empty.
+		"""	
+		if (len(_os) > 0 and len(_class) > 0):
+			abs_path = self.get_base()
+			#******************************************************************
+			# Find the directory corresponding to the OS of the
+			# malware. If none found, used the OTHERS folder.
+			#******************************************************************
+			if (_os in FileSystem.OsToFolder):
+				abs_path = os.path.join(abs_path, FileSystem.OsToFolder[_os])
+			else:
+				abs_path = os.path.join(abs_path, FileSystem.SUBFOLDER_OTHERS)
+	
+			#******************************************************************
+			# Find the directory corresponding to the class of the
+			# malware. If none found, used the OTHERS folder.
+			#******************************************************************
+			if (_class in FileSystem.ClassToFolder):
+				abs_path = os.path.join(abs_path, FileSystem.ClassToFolder[_class])
+			else:
+				abs_path = os.path.join(abs_path, FileSystem.SUBFOLDER_MISC)
+			
+			return abs_path
+		else:
+			raise Exception(ERR_INVALID_OS_CLASS)
+	
 	def create_filesystem(self):
+		"""Creates the file system on the disk.
+
+		This function will create the file system on the disk
+		to be used by the fault to archive malware.
+
+		Args:
+			None.
+
+		Returns:
+			None
+
+		Raises:
+			Exception if the base is invalid or an error occured
+			while creating the directories.
+		"""	
 		if (self.get_base() and os.path.isdir(self.get_base())):
-			systems = self.FileStructure[self.get_base()]
+			# Create database file at base directory
+			self.create_db_file()
+			# The first level of directories are operating
+			# systems.
+			systems = self.OperatingSystems
 			for system in systems:
+				# Create the directory of the operating system
+				# if it is not already existing.
 				directory = os.path.join(self.get_base(), system)
 				if not os.path.exists(directory):
 					os.makedirs(directory)
-					self.logger.print_success("Created '{:s}'".format(directory))
+					self.logger.print_debug("Created '{:s}'".format(directory))
+				# Get the subdirectories for this operating system.
 				subdirectories = self.FileStructure[system]
 				for s in subdirectories:
+					# Create each subdirectory if it is not already
+					# existing.
 					subdir = os.path.join(directory, s)
 					if not os.path.exists(subdir):
 						os.makedirs(subdir)
-						self.logger.print_success("Created '{:s}'".format(subdir))
+						self.logger.print_debug("Created '{:s}'".format(subdir))
 		else:
 			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(self.base))
 	
-	def create_database(self, _dbfile="", _overwrite=False):
-		VaultDb = VaultDatabase(_logger=self.logger)
-		if (len(_dbfile) > 0):
-			VaultDb.set_db_file(_dbfile)
-		VaultDb.create_db_file(_overwrite)
-		
-	def get_pit(self):
-		return os.path.join(self.get_base(), FileSystem.SUBFOLDER_OTHERS)
+	def filesystem_exists(self):
+		"""Verifies if this vault has already been created
+		in the filesystem.
+
+		This function will confirm if the vault has been created
+		on the file system. It checks if a database file exists
+		in the base folder. This function then checks if all
+		directories and sub-directories defined in the FileSystem.FileStructure
+		dictionary object exists within the base folder. If one is missing,
+		the function will return false.
+
+		Args:
+			None.
+
+		Returns:
+			True if the vault database file has been created in the 
+			base folder and each directory defined in FileSystem.FileStructure
+			exists. Returns False otherwise.
+
+		Raises:
+			Exception if the configured base directory is empty or invalid.
+		"""	
+		if (self.get_base() and os.path.isdir(self.get_base())):
+			# Gets the absolute path of the database file.
+			db_file = self.get_db_file()
+			# Verifies if the file exists.
+			if (os.path.isfile(db_file)):
+				# Start checking if every directory exists.
+				for (os_dir, class_dirs) in FileSystem.FileStructure.iteritems():
+					os_dir = os.path.join(self.get_base(), os_dir)
+					if (not os.path.isdir(os_dir)):
+						# Current directory not found. Return false.
+						self.logger.print_debug(ERR_DIR_NOT_FOUND.format(os_dir))
+						return False
+					else:
+						for class_dir in class_dirs:
+							class_dir = os.path.join(os_dir, class_dir)
+							if (not os.path.isdir(class_dir)):
+								# Current sub-directory not found. Return false.
+								self.logger.print_debug(ERR_DIR_NOT_FOUND.format(class_dir))
+								return False
+			else:
+				self.logger.print_debug(ERR_DB_FILE_NOT_FOUND.format(db_file))
+				return False
+			
+			return True
+		else:
+			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(self.base))
+			
+	def archive_file(self, _vx, _password=Vault.DefaultArchivePassword):
+		"""Archives the malware into the file system.
+
+		This function will archive the file(s) contained in the Virus
+		object into an archive file format. The archive will be created
+		to the vault with the password specified. The archive will be place
+		in the directory corresponding to its class and targeted operating
+		system.
+
+		Args:
+			_vx : The virus object containing malware information.
+			_password: Password to use for the archive. If none specified,
+			the value in Vault.DefaultArchivePassword will be used.
+
+		Returns:
+			None
+
+		Raises:
+			Exception if the received Virus object is null.
+		"""	
+		#
+		# Verifies a valid Virus object was received (not null)
+		#
+		if (_vx):
+			#
+			# Ensure the properties of the malware have 
+			# been captured.
+			#
+			_vx.generate_properties()
+			#
+			# Gets the os and class of the malware
+			#
+			vx_os = _vx.get_os()
+			vx_class = _vx.get_class()
+			#
+			# Gets the path corresponding to the os and class
+			# of the malware.
+			#
+			dst_path = self.get_directory(vx_os, vx_class)
+			#
+			# Move the file from its current location to the
+			# vault.
+			#
+			src_file = _vx.get_file()
+			dst_file = os.path.join(dst_path, _vx.get_archive_name()) + self.archiver.get_extension()
+			print(INFO_MOVING_FILE.format(src_file, dst_file))
+			self.archiver.archive(_vx, dst_file)
+			self.logger.print_debug(INFO_MOVING_FILE.format(src_file, dst_file))
+			
+			#
+			# Delete the original files from the pit. Prevents
+			# from re-analyzing them and saves space.
+			#
+			files_to_del = _vx.get_files()
+			for file_to_del in files_to_del:
+				self.logger.print_debug("Deleting '{:s}'...".format(file_to_del))
+				#os.remove(file_to_del)
+			
+		else:
+			raise Exception("Invalid malware object: Virus object cannot be null.")
