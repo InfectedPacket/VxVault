@@ -261,7 +261,7 @@ class FileSystem(object):
 	WindowsSubFolders = LinuxSubFolders +[SUBFOLDER_CRYPTER,SUBFOLDER_EXPLOITKIT]
 	AndroidSubFolders = LinuxSubFolders +[SUBFOLDER_EXPLOITKIT]	
 	WebSubFolders = [SUBFOLDER_WEBSHELL, SUBFOLDER_EXPLOITKIT]
-	OthersSubFolders = [SUBFOLDER_URLS]
+	PitSubFolders = [SUBFOLDER_URLS]
 
 	#**************************************************************************
 	# Defines the structure of the  file system.
@@ -275,8 +275,8 @@ class FileSystem(object):
 		SUBFOLDER_ANDROID 	:	AndroidSubFolders,
 		SUBFOLDER_WEB		: 	WebSubFolders,
 		SUBFOLDER_ANY		: 	WindowsSubFolders,		
-		SUBFOLDER_OTHERS 	:	OthersSubFolders,
-		SUBFOLDER_PIT 		:	[]
+		SUBFOLDER_OTHERS 	:	[],
+		SUBFOLDER_PIT 		:	PitSubFolders
 	}
 
 	#**************************************************************************
@@ -636,7 +636,7 @@ class FileSystem(object):
 			files_to_del = _vx.get_files()
 			for file_to_del in files_to_del:
 				self.logger.print_debug("Deleting '{:s}'...".format(file_to_del))
-				#os.remove(file_to_del)
+				os.remove(file_to_del)
 			
 		else:
 			raise Exception("Invalid malware object: Virus object cannot be null.")

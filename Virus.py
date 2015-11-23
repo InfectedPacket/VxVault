@@ -385,7 +385,7 @@ class Virus(object):
 		# If not, include the MD5 as a unique identifier
 		# of the malware.
 		if (vx_name == Virus.UNKNOWN):
-			vx_md5 = self.get_md5()
+			vx_md5 = self.md5()[0]
 			archive_name = "{:s}.{:s}".format(Virus.UNKNOWN, vx_md5.upper())
 		else:
 			archive_name = filename_fmt.format(vxclass=vx_class,
