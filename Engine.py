@@ -290,6 +290,8 @@ class Engine(object):
 		# Add hunters to the list of active hunter
 		# objects
 		#**********************************************************************
+		hunter_malcode.start()
+		hunter_local.start()
 		self.active_hunters.append(hunter_malcode)
 		self.active_hunters.append(hunter_local)
 		
