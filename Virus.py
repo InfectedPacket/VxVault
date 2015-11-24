@@ -385,7 +385,7 @@ class Virus(object):
 		# If not, include the MD5 as a unique identifier
 		# of the malware.
 		if (vx_name == Virus.UNKNOWN):
-			vx_md5 = self.md5()[0]
+			vx_md5 = self.md5()
 			archive_name = "{:s}.{:s}".format(Virus.UNKNOWN, vx_md5.upper())
 		else:
 			archive_name = filename_fmt.format(vxclass=vx_class,
@@ -444,17 +444,16 @@ class Virus(object):
 		if (_property in Virus.VirusIdentItems):
 			if (self.is_detected_by(Virus.AV_KASPERSKY)):
 				kaspersky_ident = self.get_detection_by(Virus.AV_KASPERSKY)
+				#
+				# Sometime the prefix "not-a-virus" is added for Adware
+				# software. This prefix is removed here.
+				#
+				if ("not-a-virus:" in kaspersky_ident):
+					kaspersky_ident = kaspersky_ident.split(":")[1]
 				self.logger.print_debug(INFO_DETECTED_BY.format(Virus.AV_KASPERSKY, kaspersky_ident))
 				name_fmt = Virus.AvNameFormats[Virus.AV_KASPERSKY]
 				id_items = parse(name_fmt, kaspersky_ident)
 				self.logger.print_debug("Value for '{:s}' found in Kaspersky ident: {:s}".format(_property, id_items[_property]))
-				return id_items[_property]
-			elif (self.is_detected_by(Virus.AV_TENCENT)):
-				tencent_ident = self.get_detection_by(Virus.AV_TENCENT)
-				self.logger.print_debug(INFO_DETECTED_BY.format(Virus.AV_TENCENT, tencent_ident))
-				name_fmt = Virus.AvNameFormats[Virus.AV_TENCENT]
-				id_items = parse(name_fmt, tencent_ident)
-				self.logger.print_debug("Value for '{:s}' found in Tencent ident: {:s}".format(_property, id_items[_property]))
 				return id_items[_property]
 			else:
 				scoreboard = {}
@@ -503,14 +502,19 @@ class Virus(object):
 
 
 	def md5(self):
-		files = self.get_files()
+		file = self.get_file()
 		md5 = self.properties[Virus.VX_PROPERTY_MD5]
-		for file in files:
-			hash = hashlib.md5()
- 			with open(file, "rb") as f:
-  				for chunk in iter(lambda: f.read(4096), b""):
-					hash.update(chunk)
-			md5[file] = hash.hexdigest()
+		hash = hashlib.md5()
+ 		with open(file, "rb") as f:
+  			for chunk in iter(lambda: f.read(4096), b""):
+				hash.update(chunk)
+		md5 = hash.hexdigest()		
+		#for file in files:
+		#	hash = hashlib.md5()
+ 		#	with open(file, "rb") as f:
+  		#		for chunk in iter(lambda: f.read(4096), b""):
+		#			hash.update(chunk)
+		#	md5[file] = hash.hexdigest()
 		return md5
 
 	def sha1(self):
