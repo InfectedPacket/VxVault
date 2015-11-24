@@ -49,6 +49,7 @@ __version__ = '.'.join(__version_info__)
 import os
 import sys
 import time
+import signal
 import argparse
 
 from Engine import Engine
@@ -113,6 +114,13 @@ def banner():
     License v3 for more information. 
     """)
 
+engine = None	
+	
+def signal_handler(signal, frame):
+		print('You pressed Ctrl+C!')
+		engine.shutdown()
+		sys.exit(0)	
+	
 def main(args):
 	#**************************************************************************
 	# Initialization of the vault mechanisms
@@ -179,12 +187,19 @@ def main(args):
 	# Let the engine run until the user presses
 	# Control-C to stop.
 	#**************************************************************************
+	signal.signal(signal.SIGINT, signal_handler)
+	# For debugging:
+	count = 500
 	try:
-		time.sleep(1)
+		while (count > 0):
+			time.sleep(1)
+			count -= 1
 	except KeyboardInterrupt:
 		main_logger.print_info(INFO_CTRLC_INT)
-		engine.shutdown()
-						
+		
+	engine.shutdown()
+			
+			
 if __name__ == "__main__":
 	banner()
 	main(parser.parse_args())
