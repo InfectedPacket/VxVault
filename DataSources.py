@@ -165,7 +165,7 @@ class VirusTotalSource(VxDataSource):
 		if (_vx):
 			vx_files = _vx.get_files()
 			if (len(vx_files) > 0):
-				vx_md5 = _vx.md5()[vx_files[0]]
+				vx_md5 = _vx.md5()
 				self.logger.print_debug(INFO_GET_INDENTS.format(vx_files[0], vx_md5))
 				request_params = {VirusTotalSource.PARAM_RSRC: vx_md5, 
 									VirusTotalSource.PARAM_APIKEY: self.get_param_value(VirusTotalSource.PARAM_APIKEY)}
