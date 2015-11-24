@@ -80,6 +80,7 @@ class Virus(object):
 	AV_MICROSOFT	=	"Microsoft"
 	AV_KASPERSKY	=	"Kaspersky"
 	AV_BAIDU		=	"Baidu-International"
+	AV_VIPRE		=	"VIPRE"
 
 	DEFAULT_IDENT_FORMAT	=	AV_KASPERSKY	
 	
@@ -193,7 +194,8 @@ class Virus(object):
 		AV_TRENDMICRO	:	"{vxclass}.{name}",
 		AV_MICROSOFT	:	"Microsoft",
 		AV_KASPERSKY	:	"{vxclass}.{os}.{name}.{variant}",
-		AV_BAIDU		:	"{vxclass}.{os}.{name}.{variant}"
+		AV_BAIDU		:	"{vxclass}.{os}.{name}.{variant}",
+		AV_VIPRE		:	"{vxclass}.{os}.{name}!{variant}"
 	}
 		
 	NormalizedLabels = {
@@ -356,7 +358,14 @@ class Virus(object):
 			return True
 	
 	def get_archive_name(self):
-		return self._create_archive_filename()
+		chars = "\\`*:{}[]()>#+-!$&=\"\'"
+		vx_name = self._create_archive_filename()
+		# 
+		# If there any special character in the filename,
+		# replace them with an authorized character.
+		for c in chars:
+			vx_name = vx_name.replace(c, "_")
+		return vx_name
 	
 	def _create_archive_filename(self):
 		self.logger.print_debug(INFO_GENERATE_ARCHIVE)
@@ -404,7 +413,10 @@ class Virus(object):
 				vx_class = self._guess_property_from_scans(Virus.VX_PROPERTY_CLASS)
 			except:
 				vx_class = Virus.UNKNOWN
-				
+			
+			if (u":" in vx_class):
+				vx_class = vx_class.split(u":")[1]
+			
 			if (vx_class.lower() in Virus.NormalizedLabels):
 				vx_class = Virus.NormalizedLabels[vx_class.lower()]
 			self.set_class(vx_class)
@@ -424,7 +436,9 @@ class Virus(object):
 				vx_name = self._guess_property_from_scans(Virus.VX_PROPERTY_NAME)
 			except:
 				vx_name = Virus.UNKNOWN
-				
+			
+			
+			
 			self.set_name(vx_name)
 			
 		if (vx_variant == Virus.UNKNOWN):
@@ -444,12 +458,6 @@ class Virus(object):
 		if (_property in Virus.VirusIdentItems):
 			if (self.is_detected_by(Virus.AV_KASPERSKY)):
 				kaspersky_ident = self.get_detection_by(Virus.AV_KASPERSKY)
-				#
-				# Sometime the prefix "not-a-virus" is added for Adware
-				# software. This prefix is removed here.
-				#
-				if ("not-a-virus:" in kaspersky_ident):
-					kaspersky_ident = kaspersky_ident.split(":")[1]
 				self.logger.print_debug(INFO_DETECTED_BY.format(Virus.AV_KASPERSKY, kaspersky_ident))
 				name_fmt = Virus.AvNameFormats[Virus.AV_KASPERSKY]
 				id_items = parse(name_fmt, kaspersky_ident)
