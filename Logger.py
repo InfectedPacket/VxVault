@@ -59,7 +59,7 @@ class Logger(object):
 		self.print_msg(Logger.MSG_DEBUG, _message)
 
 	def get_input(self, _message):
-		uinput = raw_input("[?] {:s}".format(_message))
+		uinput = raw_input(u"[?] {:s}".format(_message))
 		return uinput
 
 	def print_msg(self, _type, _msg):
@@ -81,27 +81,27 @@ class Logger(object):
 	    if (_type == Logger.MSG_ERROR):
 			exc_type, exc_obj, exc_tb = sys.exc_info()
 			if (exc_tb):
-				self.output.write("[-] " + _msg + "[{:d}]\n".format(exc_tb.tb_lineno))
+				self.output.write(u"[-] {:s}[{:d}]\n".format(_msg, exc_tb.tb_lineno))
 			else:
-				self.output.write("[-] " + _msg + "\n")
+				self.output.write(u"[-] {:s}\n".format(_msg))
 	    # Warning-type message
 	    elif (_type == Logger.MSG_WARN):
-			self.output.write("[!] " + _msg + "\n")
+			self.output.write(u"[!] {:s}\n".format(_msg))
 	    #Information-type message
 	    elif (_type == Logger.MSG_INFO):
-			self.output.write("[*] " + _msg + "\n")
+			self.output.write(u"[*] {:s}\n".format(_msg))
 	    #Successful operation message
 	    elif (_type == Logger.MSG_SUCCESS):
-			self.output.write("[+] " + _msg + "\n")
+			self.output.write(u"[+] {:s}\n".format(_msg))
 	    #Debugging information
 	    elif (_type == Logger.MSG_DEBUG):
 			if (self.debug):
-				self.output.write("[>] " + _msg + "\n")
+				self.output.write(u"[>] {:s}\n".format(_msg))
 	    #User-input request
 	    elif (_type == Logger.MSG_INPUT):
-			self.output.write("[?] " + _msg)
+			self.output.write(u"[?] {:s}".format(_msg))
 	    else:
-			self.output.write("    " + _msg + "\n")
+			self.output.write(u"    {:s}\n".format(_msg))
 
 	def print_setting(self, _prefixtabs, _setting, _value):
 		linesize = Logger.LINE_WIDTH
