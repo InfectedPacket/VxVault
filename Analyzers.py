@@ -69,7 +69,7 @@ class Analyzer(threading.Thread):
 	DefaultThreadName  = "vx_pit_analyzer"
 
 	# Default sleep time for the thread in seconds.
-	DefaultWaitDelay = 3
+	DefaultWaitDelay = 10
 	
 	def __init__(self, _vxdata, _vault, _logger=None):
 		#**********************************************************************
@@ -210,7 +210,7 @@ class Analyzer(threading.Thread):
 						self.vault.archive_file(vx)
 						
 					except Exception as e:
-						self.logger.print_error(ERR_FAIL_DATA_RET.format(vx_file, e.message))
+						self.logger.print_error(ERR_FAIL_DATA_RET.format(vx_file, str(e.message)))
 						
 					#**********************************************************
 					# The next_run variable holds the time of the next time the 
@@ -226,8 +226,11 @@ class Analyzer(threading.Thread):
 					#**********************************************************
 					while (datetime.now() < self.next_run and self.analyze):
 						time.sleep(Analyzer.DefaultWaitDelay)
-	
+
 					if (not self.analyze):
 						break
-						
+			else:
+				self.logger.print_debug("No files found in pit.")
+				time.sleep(Analyzer.DefaultWaitDelay)
+				
 		self.logger.print_warning(INFO_THREAD_SHUTDOWN.format(self.name))
