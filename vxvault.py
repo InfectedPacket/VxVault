@@ -189,7 +189,7 @@ def main(args):
 	#**************************************************************************
 	signal.signal(signal.SIGINT, signal_handler)
 	# For debugging:
-	count = 500
+	count = 50
 	try:
 		while (count > 0):
 			time.sleep(1)
