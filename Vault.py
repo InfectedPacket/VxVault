@@ -43,6 +43,7 @@ import platform
 from Virus import Virus
 from Logger import Logger
 from Archivers import SevenZipArchiver
+from VaultDatabase import VaultDatabase
 #//////////////////////////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////////////////////////
@@ -327,6 +328,11 @@ class FileSystem(object):
 		#**********************************************************************
 		self.set_base(_base)
 		
+		#
+		# Create the database of the vault.
+		#
+		self.Database = VaultDatabase(self.get_db_file)
+		
 		#**********************************************************************
 		# Specify the first level of directories to create in the base
 		# directory, i.e. list of operating systems.
@@ -382,13 +388,7 @@ class FileSystem(object):
 		"""			
 		return self.base
 	
-	def create_db_file(self):
-		db_file = self.get_db_file()
-		with open(db_file, "w") as f:
-			pass
-		if (not os.path.isfile(db_file)):
-			raise Exception(ERR_FAILED_CREATE_DB.format(db_file))
-	
+
 	def set_archiver(self, _archiver):
 		""" Sets the Archiver to be used by the Vault to archive and 
 		compress malware into the filesystem.
@@ -409,6 +409,14 @@ class FileSystem(object):
 			self.archiver = _archiver
 		else:
 			raise Exception("Archiver object cannot be null.")
+	
+	def create_db_file(self):
+		db_file = self.get_db_file()
+		with open(db_file, "w") as f:
+			pass
+		if (not os.path.isfile(db_file)):
+			raise Exception(ERR_FAILED_CREATE_DB.format(db_file))
+	
 	
 	def get_db_file(self):
 		"""Returns the absolute path of the database file.
@@ -637,6 +645,11 @@ class FileSystem(object):
 			for file_to_del in files_to_del:
 				self.logger.print_debug("Deleting '{:s}'...".format(file_to_del))
 				os.remove(file_to_del)
+			
+			#
+			# TODO:
+			# [ ] Add to database
+			_vx.set_password(Vault.DefaultArchivePassword)
 			
 		else:
 			raise Exception("Invalid malware object: Virus object cannot be null.")
