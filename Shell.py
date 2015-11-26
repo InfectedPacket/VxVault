@@ -49,6 +49,7 @@ from DataSources import *
 from Hunters import *
 import urllib2
 from BeautifulSoup import BeautifulSoup
+from VaultDatabase import VaultDatabase
 
 #//////////////////////////////////////////////////////////
 
@@ -236,18 +237,13 @@ class Shell(object):
 						self.logger.print_error("{:s} malcode|(local <directory>|stopall)".format(ShellConfig.CMD_HUNT))
 			
 				elif (cmd.lower() == ShellConfig.CMD_TEST):		
-					#engine.start_vt_analyzer()
-					vx = Virus(_logger=self.logger)
-					vx.add_file("c:\\vx\\warning\\biohazard\\pit\\avrm.exe")
-					try:
-						self.logger.print_debug("Vx Archive Name: {:s}.".format(vx._create_archive_filename()))
-					except Exception as e:
-						self.logger.print_debug(e.message)
-					data_source = VirusTotalSource(
-						_apikey="1111",
-						_logger=self.logger)
-					data_source.retrieve_metadata(vx)
-					self.logger.print_debug("Vx Archive Name: {:s}.".format(vx._create_archive_filename()))
+					vdb = VaultDatabase(".vxvault.db", _logger=self.logger)
+					vdb.create_database(_overwrite=True)
+					dummy = Virus()
+					dummy.set_archive("Trojan.Win32.Test.AAA")
+					dummy.set_password("infected")
+					#dummy.add_file("server.exe")
+					vdb.add_archive(dummy)
 				else:
 					self.logger.print_error("Unknown command {:s}.".format(cmd))
 			except Exception as e:
