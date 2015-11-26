@@ -122,6 +122,7 @@ class Virus(object):
 	VX_PROPERTY_NAME	= "name"
 	VX_PROPERTY_SIZE	= "size"
 	VX_PROPERTY_CLASS	= "vxclass"
+	VX_PROPERTY_PASS	= "password"
 	VX_PROPERTY_VERS	= "variant"
 	VX_PROPERTY_DATE	= "date"
 	VX_PROPERTY_COUNTRY	= "country"
@@ -279,6 +280,12 @@ class Virus(object):
 	def set_archive(self, _archive):
 		self.set_property(Virus.VX_PROPERTY_ARCHIVE, _archive)
 
+	def get_password(self):
+		return self.get_property(Virus.VX_PROPERTY_PASS)
+
+	def set_password(self, _password):
+		self.set_property(Virus.VX_PROPERTY_PASS, _password)
+	
 	def set_property(self, _property, _value):
 		self.properties[_property] = _value
 
@@ -357,7 +364,7 @@ class Virus(object):
 					return False
 			return True
 	
-	def get_archive_name(self):
+	def generate_archive_name(self):
 		chars = "\\`*:{}[]()>#+-!$&=\"\'"
 		vx_name = self._create_archive_filename()
 		# 
@@ -365,6 +372,7 @@ class Virus(object):
 		# replace them with an authorized character.
 		for c in chars:
 			vx_name = vx_name.replace(c, "_")
+		self.set_archive(vx_name)
 		return vx_name
 	
 	def _create_archive_filename(self):
@@ -414,6 +422,10 @@ class Virus(object):
 			except:
 				vx_class = Virus.UNKNOWN
 			
+			#
+			# In some case, additional data is added in the
+			# class of the malware, i.e. HEUR or  not-a-virus (for Adware)
+			# This is removed to have uniform properties.
 			if (u":" in vx_class):
 				vx_class = vx_class.split(u":")[1]
 			
