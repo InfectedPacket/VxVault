@@ -1,6 +1,6 @@
 #
 *.pyc
-*.sql
+
 
 # Windows image file caches
 Thumbs.db
@@ -49,3 +49,4 @@ Temporary Items
 vxvault.bat
 *.bat
 db/vxvault.mwb
+.vxvault.db
