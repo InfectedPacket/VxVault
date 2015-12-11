@@ -39,7 +39,7 @@
 #
 PROGRAM_NAME = "vxvault"
 PROGRAM_DESC = ""
-PROGRAM_USAGE = "%(prog)s [-i] [-h|--help] (OPTIONS)"
+PROGRAM_USAGE = "%(prog)s -a PATH|-i PATH|--hunt -vt APIKEY [-p PASSWORD] [-v]| [-h|--help]"
 
 __version_info__ = ('0','1','0')
 __version__ = '.'.join(__version_info__)
@@ -84,17 +84,17 @@ vault_options.add_argument("-b", "--base",
 	dest="base", 
 	required=True,
 	default=os.getcwd(),
-	help="Specifies the location of the vault to use.")
+	help="Specifies the base directory of the vault.")
 vault_options.add_argument("-vt", "--vtapi", 
 	dest="vtapikey", 
 	required=True,
-	help="Provides the public key to use the API of VirusTotal.")	
+	help="Specifies the public key to use the API of VirusTotal.")	
 vault_options.add_argument("-a", "--add", 
 	dest="newfile",
-	help="Specifies a file or directory containing files to a single malware to add to the vault.")
+	help="File or directory of a single malware to add to the vault.")
 vault_options.add_argument("-i", "--import", 
 	dest="import_dir",
-	help="Specifies a directory containing files to multiple malware to import into the vault.")
+	help="Specifies a directory containing multiple malware to import into the vault.")
 vault_options.add_argument("-p", "--password", 
 	dest="password",
 	default="",
@@ -103,13 +103,10 @@ vault_options.add_argument("--hunt",
 	dest="hunt_mode",
 	action="store_true",
 	help="Starts the vault in hunt mode.")
-vault_options.add_argument("--test", 
-	dest="test",
-	action="store_true")
 vault_options.add_argument("--verbose", 
 	dest="verbose", 
 	action="store_true",
-	help="Provides the public key to use the API of VirusTotal.")	
+	help="Displays diagnostic messages while VxVault is running.")	
 #//////////////////////////////////////////////////////////////////////////////
 
 def banner():
