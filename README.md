@@ -66,4 +66,41 @@ Vault Options:
 
 ## Examples
 
-TODO.
+
+### Adding a new malware sample
+
+The following command will add a single file, named badfile.exe to the vault. The -b options specified the location of the vault, while the -vt option is used to retrieve scan information for the file. 
+
+```
+python vxvault.py -b c:\vx\ -vt sd56fs65sd65fg4s6d5g4s65g4s6d5g4sd54 -a c:\tmp\badfile.exe
+```
+
+If no previous vault has been created in the directory, VxVault will ask you if you want to created one prior to starting.
+
+To add a malware containing multiple files, copy all the files into a single directory and use the -a options with the directory containing the files:
+
+```
+python vxvault.py -b c:\vx\ -vt sd56fs65sd65fg4s6d5g4s65g4s6d5g4sd54 -a c:\tmp\ratfiles\
+```
+
+### Adding multiple samples
+
+If you need to add multiple samples at the same time, copy all the samples, either files or directories into a directory, and use the -i options:
+
+```
+python vxvault.py -b c:\vx\ -vt sd56fs65sd65fg4s6d5g4s65g4s6d5g4sd54 -i c:\tmp\samples\
+```
+
+### Hunting mode
+
+The command below will use the C:\vx directory as the base directory for the vault. It will then enter into 'hunt' mode, which will spawn 'hunters' threads. The threads will each poll their different data sources for new malware samples and download them to the vault.
+
+```
+python vxvault.py -b c:\vx\ -vt sd56fs65sd65fg4s6d5g4s65g4s6d5g4sd54 --hunt
+```
+
+## Issues and Bugs
+
+Please report any bugs with this program to the Github page of this project at https://github.com/InfectedPacket/VxVault.
+
+
