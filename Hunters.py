@@ -44,44 +44,102 @@ import feedparser
 from Logger import Logger
 from datetime import datetime, timedelta
 from BeautifulSoup import BeautifulSoup
+from VaultExceptions import *
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 # Globals and Constants
+
+FILE_EXE	=	"exe"
+FILE_DLL	=	"dll"
+FILE_SCR 	=	"scr"
+FILE_DOC	=	"doc"
+FILE_PDF	=	"pdf"
+FILE_APK	=	"apk"
+FILE_JAR	=	"jar"
+FILE_DOCX	=	"docx"
+FILE_ZIP	=	"zip"
+
+HTTP_URL_FORMAT = u"http://{:s}"	
+
 ERR_INVALID_DEST_DIR	=	"Invalid directory: '{:s}'."
 ERR_FAILED_PARSE_MALCODE=	"Failed to parse MalC0de feed : '{:s}'."
-ERR_FAILED_DOWNLOAD		=	u"Failed to download file '{:s}': {:s}"
-MSG_INFO_DOWNLOADING	=	u"Downloading {:s} from {:s}."
+ERR_FAILED_DOWNLOAD		=	u"Failed to download file '{:s}': {:s}."
 ERR_FILE_NO_CONTENTS	=	"No contents found in '{:s}'."
+
 MSG_INFO_CONNECTING 	=	"Connecting to '{:s}'..."
+MSG_INFO_DOWNLOADING	=	u"Downloading {:s} from {:s}."
 MSG_INFO_NB_ENTRIES		=	"{:d} new entries found."
-MSG_WARN_NB_ENTRIES		=	"Considering only {:d} entries."
 MSG_INFO_NEXT_RUN		=	"Next run: {:%H:%M:%S}"
+
+MSG_WARN_NB_ENTRIES		=	"Considering only {:d} entries."
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 # Classes
+#
 class Hunter(threading.Thread):
+	__metaclass__ = abc.ABCMeta
 
-	DefaultHuntWait = 1
+	DefaultThreadName = "vx-hunter"
+	DefaultHuntWait = 10
 	DefaultHuntInterval = 3600
-	HuntedExtensions = ["exe", "dll", "scr", "doc", "pdf", "apk", "jar", "docx", "zip"]
+	HuntedExtensions = [
+		FILE_EXE, 
+		FILE_DLL, 
+		FILE_SCR, 
+		FILE_DOC, 
+		FILE_PDF, 
+		FILE_APK, 
+		FILE_JAR, 
+		FILE_DOCX, 
+		FILE_ZIP
+	]
 
-	def __init__(self, _pit, _extensions = HuntedExtensions, _logger=None):
+	def __init__(self, _engine, _extensions = HuntedExtensions, _logger=None):
+		#**********************************************************************
+		# Initializes the thread object.
+		#**********************************************************************
 		threading.Thread.__init__(self)
+		#**********************************************************************
+		# Creates a new logger object.
+		#**********************************************************************
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger	
-		self.name="vx-hunter"
+		
+		#**********************************************************************
+		# Sets properties of the hunter.
+		#**********************************************************************
+		self.name=Hunter.DefaultThreadName
 		self.is_hunting = True
-		if (_pit and os.path.isdir(_pit)):
-			self.pit = _pit
-		else:
-			raise Exception(ERR_INVALID_DEST_DIR.format(_dst))
 		
 		self.extensions = _extensions
+		
+		if (_engine):
+			self.engine = _engine
+			#******************************************************************
+			# Sets download location.
+			#******************************************************************
+			self.pit = _engine.get_vault().get_pit()
+		else:
+			raise NullOrEmptyArgumentException()
 
-	
 	def stop_hunting(self):
+		"""
+			Flags the thread to stop scanning/hunting.
+			
+			This functions sets the hunting flag to False, which will
+			cause the main loop of the thread to exit.
+			
+			Args:
+				None.
+				
+			Returns:
+				None.
+				
+			Raises:
+				None.
+		"""
 		self.is_hunting = False;
 	
 	@abc.abstractmethod
@@ -91,67 +149,80 @@ class Hunter(threading.Thread):
 	def run(self):
 	
 		while (self.is_hunting):
+			#******************************************************************
+			# Retrieves the new urls to download from the
+			# child class.
+			#******************************************************************
 			new_targets = self.get_new_urls_since(datetime.now())
+			
+			#******************************************************************
+			# Processes all new urls retrieved, if any.
+			#******************************************************************
 			for vx_url in new_targets:
-				#vx_url = urllib.unquote(vx_url).decode('utf8') 
-				vx_url = urllib.unquote(vx_url)
-				vx_src_file = vx_url.split("/")[-1]						
-				vx_in_pit = [ f for f in os.listdir(self.pit) if os.path.isfile(f) ]
-				# TODO:
-				# [ ] Need to change to DB, files are deleted from the
-				# pit now.
-				if (not vx_src_file in vx_in_pit):
-					vx_dst_file = os.path.join(self.pit, vx_src_file)
-					if u"?" in vx_src_file:
-						vx_request = vx_dst_file.split(u"?")
-						vx_dst_file = vx_request[0]
-
-					self.logger.print_info(MSG_INFO_DOWNLOADING.format(vx_src_file, vx_url))
-					try:
-						urllib.urlretrieve (vx_url, vx_dst_file)
-					except Exception as e:
-						self.logger.print_error(ERR_FAILED_DOWNLOAD.format(vx_src_file, e.message))
-				else:
-					self.logger.print_info(u"File '{:s}' already exists in pit.".format(vx_src_file))
-			self.next_hunt = datetime.now() + timedelta(seconds=Hunter.DefaultHuntInterval)
-			self.logger.print_info(MSG_INFO_NEXT_RUN.format(self.next_hunt))
+				try:
+					#**********************************************************
+					# Use the engine to add the newly found URL to the
+					# vault.
+					#**********************************************************
+					self.engine.add_http_file_virus(vx_url)
+				except Exception as e:
+					self.logger.print_error(e.message)
+			
+				#**************************************************************
+				# To prevent flooding the data source with requests,
+				# we wait for a few seconds.
+				#**************************************************************
+				self.next_hunt = datetime.now() + timedelta(seconds=Hunter.DefaultHuntInterval)
+				self.logger.print_info(MSG_INFO_NEXT_RUN.format(self.next_hunt))
 			
 			while (datetime.now() < self.next_hunt and self.is_hunting):
 				if self.is_hunting == True:
 					time.sleep(Hunter.DefaultHuntWait)
 			
-		self.logger.print_warning("Hunt completed. Thread '{:s}' is terminated.".format(self.name))
+		self.logger.print_warning(INFO_HUNT_COMPLETE.format(self.name))
 		
 class MalcodeHunter(Hunter):
 
-	THREAD_NAME = "vx-hunter-malcode"
+	DefaultThreadName = u"vx-hunter-malcode"
+	MalcodeRssSummarySeparator = u":"
+	MalcodeRssContentsSeparator = u","	
+	
 	URL = 'http://malc0de.com/rss/'
 	URL_MARKER = "URL:"
 	
-	def __init__(self, _pit, _extensions = Hunter.HuntedExtensions, _logger=None):
-		super(MalcodeHunter, self).__init__(_pit, _extensions, _logger)	
-		self.name=MalcodeHunter.THREAD_NAME
+	def __init__(self, _engine, _extensions = Hunter.HuntedExtensions, _logger=None):
+		super(MalcodeHunter, self).__init__(_engine, _extensions, _logger)	
+		self.name=MalcodeHunter.DefaultThreadName
 		self.last_entry = u""
 	
 	def get_new_urls_since(self, _date, _max=150):
+		"""
+		
+		Note: Malc0de does not include dates within their posts on their RSS feed,
+		so this method returns the maximum number of entries when used for the first
+		time, or all entries between the current run and the last one.
+		
+		Args:
+			_date: Last time the source was checked for new malware.
+			_max: Maximum number of entries to consider.
+			
+		Returns:
+			Array of strings representing URLs to malware files.
+			
+		Raises:
+			None.
+		"""
 		urls = []
 		
-		#TODO:
-		# [ ] Move at the beginning of the file.
-		HTTP_URL_FORMAT = u"http://{:s}"		
-		INFO_NBENTRIES_FOUND = u"New entries found: {:d}."
-		MalcodeRssSummarySeparator = u":"
-		MalcodeRssContentsSeparator = u","
-		
-		self.logger.print_debug(MSG_INFO_CONNECTING.format(MalcodeHunter.URL))
-		#
+		#**********************************************************************
 		# Retrieve the RSS feed from Malcode:
-		#
+		#**********************************************************************
+		self.logger.print_debug(MSG_INFO_CONNECTING.format(MalcodeHunter.URL))
 		malcode_rss = feedparser.parse(MalcodeHunter.URL)
 
-		#
+		#**********************************************************************
 		# Start processing entries if any where found.
-		#
+		#**********************************************************************
 		if (len(malcode_rss.entries) > 0):
 			#
 			# Verifies if some of the entries are new. I.e. check all the 
@@ -164,7 +235,7 @@ class MalcodeHunter(Hunter):
 				nb_entries += 1
 					
 			#
-			# If new entries are found, start downloading them
+			# If new entries are found, start recoding them
 			# if there's not already a sample in the vault (based on a hash)
 			#
 			if (nb_entries > 0):
@@ -178,46 +249,76 @@ class MalcodeHunter(Hunter):
 					#
 					desc = malcode_rss.entries[i].summary.strip()
 					
-					desc_items = desc.split(MalcodeRssContentsSeparator)
+					desc_items = desc.split(MalcodeHunter.MalcodeRssContentsSeparator)
 					url_data = desc_items[0]
-					#self.logger.print_debug("New url found: '{:s}'.".format(url_data))
+
+					#**********************************************************
+					# There should be 5 items in the summary of the post, if
+					# not, then something is wrong, ignore it.
+					#**********************************************************
 					if (len(desc_items) == 5):
 						if (MalcodeHunter.URL_MARKER in url_data):
-							if (MalcodeRssSummarySeparator in url_data):
-								url_data = url_data.split(MalcodeRssSummarySeparator)[1]
+							if (MalcodeHunter.MalcodeRssSummarySeparator in url_data):
+								url_data = url_data.split(MalcodeHunter.MalcodeRssSummarySeparator)[1]
 							url_data = url_data.strip()
 							
 							if (len(url_data) > 0):
-								vx_url = HTTP_URL_FORMAT.format(url_data)
-														
+								#**********************************************
+								# Prepends "HTTP" at the beginning of the found 
+								# URL, as it is usually not included.
+								#**********************************************
+								vx_url = url_data
+								if (url_data[0:4].lower() != "http"):
+									vx_url = HTTP_URL_FORMAT.format(url_data)
+											
+								#**********************************************
+								# Retrieve the filename within the URL, so 
+								# we can check if it's a file with an interesting
+								# extension.
+								#**********************************************
 								vx_file = vx_url.split("/")[-1]	
+								#**********************************************
+								# If the file contains "?", we likely have a query
+								# within the name, we need to weed it out.
+								#**********************************************
 								if (u"?" in vx_file):
 									tmp_file = vx_file.split(u"?")
+									#
+									# TODO:
+									# [ ] Check if the file is in the first
+									# or second item of the split, ie.
+									# file.exe?dl=1 or
+									# download.php?file=bad.exe
+									# Use a RE for this.
 									vx_file = tmp_file[0]
 							
+								#**********************************************
+								# Finally, get the extension and confirm we will
+								# keep the URL.
+								#**********************************************
 								vx_ext = vx_file.split('.')[-1]
+								#**********************************************
+								# If the extension is greater than 5 chars, it's
+								# probably a bad URL.
+								#**********************************************
 								if (len(vx_ext) > 5):
 									vx_ext = ""
 
 								if (vx_ext in self.extensions):
-									#self.logger.print_debug("\tNew: {:s}.".format(str(vx_url)))
 									urls.append(vx_url)
-								else:
-									self.logger.print_debug(u"Ignoring url. Extension '{:s}' is not in download list.".format(vx_ext))
 						else:
-							self.logger.print_warning(u"Could not find URL in post: \n{:s}".format(desc))
+							self.logger.print_warning(ERR_NO_URL_POST.format(desc))
 					else:
-						#raise Exception(ERR_FAILED_PARSE_MALCODE.format(desc))
 						self.logger.print_warning(ERR_FAILED_PARSE_MALCODE.format(desc))
 			else:
-				self.logger.print_warning(u"No new entries found on malcode.")
+				self.logger.print_warning(WARN_NO_NEW_ENTRIES)
 		return urls	
-	
-
 		
 class LocalHunter(Hunter):
 
-	def __init__(self, _pit, _dir, _extensions = [], _logger=None):
+	DefaultUrlRE = r'(h(tt|xx)ps?://[^\s]+)'
+
+	def __init__(self, _engine, _extensions = [], _logger=None):
 		super(LocalHunter, self).__init__(_pit, _extensions, _logger)
 		self.dir = _dir
 		
@@ -225,6 +326,10 @@ class LocalHunter(Hunter):
 		urls = []
 		self.logger.print_info(MSG_INFO_CONNECTING.format(self.dir))
 		
+		#
+		# Retrieves absolute path of all files in the dump
+		# directory.
+		#
 		local_files = [ os.path.join(self.dir, f) for f in os.listdir(self.dir) if not os.path.isfile(f) ]
 		
 		for file in local_files:
@@ -232,7 +337,7 @@ class LocalHunter(Hunter):
 			with open(file, "r") as f:
 				contents = f.read().lower()
 			if (len(contents) > 0):
-				found_urls = re.findall(r'(h(tt|xx)ps?://[^\s]+)', contents)
+				found_urls = re.findall(LocalHunter.DefaultUrlRE, contents)
 				for found_url in found_urls:
 					vx_url = found_url[0]
 					vx_file = vx_url.split("/")[-1]						

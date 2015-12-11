@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: latin-1 -*-
+#//////////////////////////////////////////////////////////////////////////////
 #█▀▀▀▀█▀▀▀▀▀██▀▀▀▀██▀▀▀▀▀▀ ▀▀▀▀▀▀▀▀▀▀▀▓▒▀▀▀▀▀▀▀▀▀▀█▓▀ ▀▀▀██▀▀▀▀▀▀▀▀▀▓▓▀▀▀▀▀▀▀▀▀▌
 #▌▄██▌ ▄▓██▄ ▀▄█▓▄▐ ▄▓█▓▓▀█ ▄▓██▀▓██▓▄ ▌▄█▓█▀███▓▄ ▌▄█▓█ ▀ ▄▓██▀▓██▓▄ ▄█▓█▀███▄■
 #▌▀▓█▓▐▓██▓▓█ ▐▓█▓▌▐▓███▌■ ▒▓██▌ ▓██▓▌▐▓▒█▌▄ ▓██▓▌ ▐▓▒█▌▐ ▒▓██▌  ▓██▓▌▓▒█▌ ▓█▓▌
@@ -41,6 +42,7 @@ import traceback
 from parse import *
 from Logger import Logger
 from operator import itemgetter
+from VaultExceptions import *
 #
 #//////////////////////////////////////////////////////////////////////////////
 #
@@ -50,7 +52,7 @@ INFO_GENERATE_ARCHIVE = "Generating archive name..."
 INFO_BEST_GUESS = "Best value for '{:s}' found with score '{:d}': {:s}"
 INFO_DETECTED_BY = "Detected by {:s} as '{:s}'."
 
-ERR_7Z_NOTFOUND = "Could not find archiving program: {:s}."
+ERR_NULL_EMPTY_PATH = "Path cannot be null or empty."
 ERR_NO_DETECTION = "No detection information available, or file is not identified as malicious."
 ERR_UNKNOWN_PROPERTY = "Unknown property"
 #//////////////////////////////////////////////////////////////////////////////
@@ -81,7 +83,20 @@ class Virus(object):
 	AV_KASPERSKY	=	"Kaspersky"
 	AV_BAIDU		=	"Baidu-International"
 	AV_VIPRE		=	"VIPRE"
+	AV_VBA32		=	"VBA32"
 
+	#
+	FILE_EXE	=	"exe"
+	FILE_DLL	=	"dll"
+	FILE_SCR 	=	"scr"
+	FILE_DOC	=	"doc"
+	FILE_PDF	=	"pdf"
+	FILE_APK	=	"apk"
+	FILE_JAR	=	"jar"
+	FILE_DOCX	=	"docx"
+	FILE_ZIP	=	"zip"
+
+	
 	DEFAULT_IDENT_FORMAT	=	AV_KASPERSKY	
 	
 	VX_CLASS_VIRUS 		= "Virus"
@@ -110,22 +125,20 @@ class Virus(object):
 	VX_OS_ANY			= "Any"
 	
 	DEFAULT_VX_NAME 	= UNKNOWN
+	DEFAULT_VX_CLASS 	= UNKNOWN
 	DEFAULT_VX_SIZE		= 0
-	DEFAULT_VX_VERS 	= "A"
-	DEFAULT_VX_CLASS	= VX_CLASS_UNKNOWN
-	DEFAULT_VX_DATE		= "1900"
+	DEFAULT_VX_VERS 	= UNKNOWN
 	DEFAULT_VX_COUNTRY	= UNKNOWN
 	DEFAULT_VX_OS		= UNKNOWN
 
-	EXTENSION_7Z		= ".7z"
-
+	#**************************************************************************
+	# List of properties about the malware to store
+	#**************************************************************************
 	VX_PROPERTY_NAME	= "name"
 	VX_PROPERTY_SIZE	= "size"
 	VX_PROPERTY_CLASS	= "vxclass"
 	VX_PROPERTY_PASS	= "password"
 	VX_PROPERTY_VERS	= "variant"
-	VX_PROPERTY_DATE	= "date"
-	VX_PROPERTY_COUNTRY	= "country"
 	VX_PROPERTY_OS		= "os"
 	VX_PROPERTY_ARCHIVE	= "archive"
 	VX_PROPERTY_DETECT	= "detect"
@@ -150,6 +163,10 @@ class Virus(object):
 		VX_CLASS_KEYLOGGER
 	]
 	
+	#**************************************************************************
+	# List of operating systems, for use with classification and
+	# storage of files on the file system.
+	#**************************************************************************
 	OperatingSystems = [
 		VX_OS_DOS,
 		VX_OS_WIN16,
@@ -175,11 +192,11 @@ class Virus(object):
 	# various security/AV vendors.
 	#**************************************************************************
 	AvNameFormats = {
-		AV_ADAWARE		:	"{}:{}.{name}.{variant}",
+		AV_ADAWARE		:	"{vxclass}.{name}.{variant}",
 		AV_AVAST		:	"{os}:{name}",
 		AV_AVG			:	"{name}.{variant}",
 		AV_AVIRA		:	"{}/{name}.{variant}.{}",
-		AV_BITDEFENDER	:	"{}:{}.{name}.{variant}",
+		AV_BITDEFENDER	:	"{vxclass}.{name}.{variant}",
 		AV_CLAM			:	"{os}.{vxclass}.{name}",
 		AV_FORTINET		:	"{vxclass}/{name}",
 		AV_COMODO		:	"{vxclass}.{os}.{name}.{variant}",
@@ -188,7 +205,7 @@ class Virus(object):
 		AV_MALBYTES		:	"MalwareBytes",
 		AV_MCAFEE		:	"{name}!{variant}",
 		AV_PANDA		:	"Panda",
-		AV_SOPHOS		:	"{class}:{name}",
+		AV_SOPHOS		:	"{vxclass}:{name}",
 		AV_ESET			:	"ESET-NOD32",
 		AV_SYMANTEC		:	"{vxclass}.{name}.{variant}",
 		AV_TENCENT		:	"{os}.{vxclass}.{name}.{variant}",
@@ -196,9 +213,26 @@ class Virus(object):
 		AV_MICROSOFT	:	"Microsoft",
 		AV_KASPERSKY	:	"{vxclass}.{os}.{name}.{variant}",
 		AV_BAIDU		:	"{vxclass}.{os}.{name}.{variant}",
-		AV_VIPRE		:	"{vxclass}.{os}.{name}!{variant}"
+		AV_VIPRE		:	"{vxclass}.{os}.{name}!{variant}",
+		AV_VBA32		:	"{vxclass}.{os}.{name}"
 	}
-		
+	
+	PayloadExtensions = [
+		FILE_EXE, 
+		FILE_DLL, 
+		FILE_SCR, 
+		FILE_DOC, 
+		FILE_PDF, 
+		FILE_APK, 
+		FILE_JAR, 
+		FILE_DOCX, 
+		FILE_ZIP
+	]
+	
+	#**************************************************************************
+	# Used to transalte vendor-specific terms into a more
+	# generic term to help with classification.
+	#**************************************************************************
 	NormalizedLabels = {
 		"dos"	:	VX_OS_DOS,
 		"msdos"	:	VX_OS_DOS,
@@ -206,12 +240,19 @@ class Virus(object):
 		"win16"	:	VX_OS_WIN16,	
 		"w32"	:	VX_OS_WIN32,
 		"win32"	:	VX_OS_WIN32,
+		"msil"	:	VX_OS_WIN32,
 		"w64"	:	VX_OS_WIN32,
 		"win64"	:	VX_OS_WIN32,
 		"troj"	: 	VX_CLASS_TROJAN,
+		"not_a_virus_adware": VX_CLASS_ADWARE,
+		"suspected of trojan": 	VX_CLASS_TROJAN,
+		"trojan_psw"	: 	VX_CLASS_TROJAN,
 		"troj_gen"		: 	VX_CLASS_TROJAN,
 		"trojan-spy"	: 	VX_CLASS_SPYWARE,
-		"trojware"		: 	VX_CLASS_TROJAN
+		"trojware"		: 	VX_CLASS_TROJAN,
+		"heur:trojan"	:	VX_CLASS_TROJAN,
+		"heur_trojan_downloader"	:	VX_CLASS_TROJAN,
+		"heur_trojan"	:	VX_CLASS_TROJAN
 	}
 	
 	def __init__(self, _logger=None):
@@ -234,8 +275,6 @@ class Virus(object):
 		self.properties[Virus.VX_PROPERTY_SIZE] = Virus.DEFAULT_VX_SIZE
 		self.properties[Virus.VX_PROPERTY_CLASS] = Virus.DEFAULT_VX_CLASS
 		self.properties[Virus.VX_PROPERTY_VERS] = Virus.DEFAULT_VX_VERS
-		self.properties[Virus.VX_PROPERTY_DATE] = Virus.DEFAULT_VX_DATE
-		self.properties[Virus.VX_PROPERTY_COUNTRY] = Virus.DEFAULT_VX_COUNTRY
 		self.properties[Virus.VX_PROPERTY_OS] = Virus.DEFAULT_VX_OS
 		self.properties[Virus.VX_PROPERTY_ARCHIVE] = ""
 		self.properties[Virus.VX_PROPERTY_MD5] = {}
@@ -243,12 +282,6 @@ class Virus(object):
 		self.properties[Virus.VX_PROPERTY_SHA256] = {}
 		self.properties[Virus.VX_PROPERTY_SSDEEP] = {}
 		
-		#**************************************************************************
-		# Initialize the dictionary of identifications by different
-		# AV products.
-		#**************************************************************************
-		self.idents = {}
-
 	def __repr__(self):
 		vx_id = self.get_name()
 		md5_hash_str = ""
@@ -260,7 +293,7 @@ class Virus(object):
 	def __str__(self):
 		str = "{vx:s}.{vers:s} ({size:d}Kb):{vxclass:s}\t{os:s}".format(
 			vx  =self.get_name(),
-			vers=self.get_version(),
+			vers=self.get_variant(),
 			size=int(self.get_size()/1024),
 			vxclass=self.get_class(),
 			os=self.get_os())
@@ -268,11 +301,63 @@ class Virus(object):
 
 
 	def add_file(self, _file):
-		self.files.append(_file)
+		"""Adds a file to the malware.
+		
+		This function adds a file to the malware. Malware can be 
+		composed of one or many files. Using the add_file function,
+		you specify the absolute path of a file part of the malware.
+		
+		Args:
+			_file: Absolute path to a file part of the malware.
 
-	def add_ident(self, _av, _ident):
-		if (len(_av) > 0 and len(_ident) > 0 and _ident.lower().strip() != "none"):
-			self.idents[_av] = _ident
+		Returns:
+			None.
+
+		Raises:
+			Exception if the file is null or empty. Will also raise
+			an exception if the file does not exists.
+		"""
+		#**********************************************************************
+		# Checks if the file is already included in the list.
+		#**********************************************************************
+		if (not (_file in self.files)):
+			vx_file = VirusFile(_file)
+			self.files.append(vx_file)
+			
+	def add_dir(self, _dir):
+		"""Adds all files in the given directory and subdirectories to the
+		Virus object.
+		
+		This function will add all files and subdirectories within the specified
+		directory to the Virus object, considering them as being part of the same
+		malware.
+		
+		Args:
+			_dir: directory containing the files and subdirectories to add.
+			
+		Returns:
+			None.
+			
+		Raises:
+			Exception if the directory is null or empty. Will also raise
+			an exception if the directory does not exists.
+		"""
+		if (_dir and len(_dir) > 0):
+			if (os.path.exists(_dir)):
+				for root, dirs, files in os.walk(_dir):
+					for name in files:
+						vx_file = VirusFile(os.path.join(root, name))
+						self.files.append(vx_file)
+			else:
+				raise FileNotFoundException(_dir)
+		else:
+			raise NullOrEmptyArgumentException()
+		
+	def set_property(self, _property, _value):
+		self.properties[_property] = _value
+
+	def get_property(self, _property):
+		return self.properties[_property]
 		
 	def get_archive(self):
 		return self.get_property(Virus.VX_PROPERTY_ARCHIVE)
@@ -285,15 +370,12 @@ class Virus(object):
 
 	def set_password(self, _password):
 		self.set_property(Virus.VX_PROPERTY_PASS, _password)
-	
-	def set_property(self, _property, _value):
-		self.properties[_property] = _value
-
-	def get_property(self, _property):
-		return self.properties[_property]
 
 	def get_file(self):
-		return self.files[0]
+		if (len(self.files) > 0):
+			return self.files[0]
+		else:
+			return []
 		
 	def get_files(self):
 		return self.files
@@ -309,74 +391,69 @@ class Virus(object):
 
 	def get_class(self):
 		return self.get_property(Virus.VX_PROPERTY_CLASS)
-
+		
 	def set_os(self, _os):
 		self.set_property(Virus.VX_PROPERTY_OS, _os)
 
 	def get_os(self):
 		return self.get_property(Virus.VX_PROPERTY_OS)
 
-	def set_version(self, _version):
+	def set_variant(self, _version):
 		self.set_property(Virus.VX_PROPERTY_VERS, _version)
 
-	def get_version(self):
+	def get_variant(self):
 		return self.get_property(Virus.VX_PROPERTY_VERS)
 
-	def reset_size(self):
-		self.set_property(Virus.VX_PROPERTY_SIZE, 0)
-
-	def add_size(self, _size):
-		current_size = self.get_size()
-		new_size = current_size + _size
-		self.set_property(Virus.VX_PROPERTY_SIZE, new_size)
-
-	def get_size(self):
-		return self.properties[Virus.VX_PROPERTY_SIZE]
-
-	def get_country(self):
-		return self.properties[Virus.VX_PROPERTY_COUNTRY]
-
-	def get_date(self):
-		return self.properties[Virus.VX_PROPERTY_DATE]
-
-	def set_antiviral_results(self, _detections = {}):
-		self.idents = _detections
+	def is_detected(self):
+		return not self.is_undetected()
 		
-	def get_antiviral_results(self):
-		return self.idents
-	
-	def is_detected_by(self, _av):
-		if (self.idents and len(self.idents) > 0):
-			return (_av in self.idents)
+	def is_undetected(self):
+		for file in self.files:
+			if file.is_undetected():
+				return True
 		return False
-	
-	def get_detection_by(self, _av):
-		if (self.idents and len(self.idents) > 0):
-			if (self.is_detected_by(_av)):
-				return self.idents[_av]
-		return None
-	
-	def is_not_detected(self):
-		if (len(self.idents) == 0): return True
-		else:
-			for (av, ident) in self.idents.iteritems():
-				if (ident != Virus.NOT_DETECTED):
-					return False
-			return True
-	
-	def generate_archive_name(self):
+		
+	def generate_archive_name(self, _extension):
 		chars = "\\`*:{}[]()>#+-!$&=\"\'"
 		vx_name = self._create_archive_filename()
 		# 
 		# If there any special character in the filename,
 		# replace them with an authorized character.
+		#
 		for c in chars:
 			vx_name = vx_name.replace(c, "_")
-		self.set_archive(vx_name)
-		return vx_name
+			
+		vx_archive = "{:s}.{:s}".format(vx_name, _extension)
+		self.set_archive(vx_archive)
+		return vx_archive
+	
+	def get_archive_sha1(self):
+		""" Gets the SHA1 hash of the archive file associated with this malware.
+		
+		This function will return the SHA1 hash of the archive file associated with
+		this malware. If no archive file has been created or exists, the function
+		raises a NoArchiveException.
+		
+		Args:
+			None.
+			
+		Returns:
+			SHA1 hash hex digest in string.
+			
+		Raises:
+			NoArchiveException: If not archive file exists for the current virus object.
+		
+		"""
+		archive = self.get_archive()
+		if (archive and len(archive) > 0 and os.path.isfile(archive)):
+			vx_archive = VirusFile(archive)
+			return vx_archive.get_sha1()
+		else:
+			raise NoArchiveException()
 	
 	def _create_archive_filename(self):
 		self.logger.print_debug(INFO_GENERATE_ARCHIVE)
+		vx_file = self.get_file()
 		
 		# Output format of the filename of the archived 
 		# malware.
@@ -384,8 +461,8 @@ class Virus(object):
 
 		# If there's already an ident with the desired
 		# filename format, just use the ident.
-		if self.is_detected_by(Virus.DEFAULT_IDENT_FORMAT):
-			return self.get_detection_by(Virus.DEFAULT_IDENT_FORMAT)
+		if vx_file.is_detected_by(Virus.DEFAULT_IDENT_FORMAT):
+			return vx_file.get_detection_by(Virus.DEFAULT_IDENT_FORMAT)
 		
 		# Make sure the properties needed are available
 		# by generating them from the idents found.
@@ -393,7 +470,7 @@ class Virus(object):
 		vx_class = self.get_class()
 		vx_os = self.get_os()
 		vx_name = self.get_name()
-		vx_variant = self.get_version()
+		vx_variant = self.get_variant()
 		
 		# Verify if we have a name/label specific to the file.
 		vx_name = self.get_name()
@@ -402,8 +479,14 @@ class Virus(object):
 		# If not, include the MD5 as a unique identifier
 		# of the malware.
 		if (vx_name == Virus.UNKNOWN):
-			vx_md5 = self.md5()
-			archive_name = "{:s}.{:s}".format(Virus.UNKNOWN, vx_md5.upper())
+			vx_filename = vx_file.get_file()
+			#
+			# Remove the extension if it's included.
+			# 
+			if (u"." in vx_filename):
+				vx_filename = vx_filename.split(u".")[0]
+			vx_md5 = vx_file.get_md5()
+			archive_name = "{:s}.{:s}".format(vx_filename, vx_md5.upper())
 		else:
 			archive_name = filename_fmt.format(vxclass=vx_class,
 				vxos=vx_os, vxname=vx_name, vxvariant=vx_variant)
@@ -414,8 +497,12 @@ class Virus(object):
 		vx_class = self.get_class()
 		vx_os = self.get_os()
 		vx_name = self.get_name()
-		vx_variant = self.get_version()
-		
+		vx_variant = self.get_variant()
+
+		#**********************************************************************
+		# Attempts to figure the class of the malware based
+		# on AV idents.
+		#**********************************************************************
 		if (vx_class == Virus.UNKNOWN):
 			try:
 				vx_class = self._guess_property_from_scans(Virus.VX_PROPERTY_CLASS)
@@ -433,9 +520,13 @@ class Virus(object):
 				vx_class = Virus.NormalizedLabels[vx_class.lower()]
 			self.set_class(vx_class)
 			
+		#**********************************************************************
+		# Attempts to figure the target OS of the malware based
+		# on AV idents.
+		#**********************************************************************
 		if (vx_os == Virus.UNKNOWN):
 			try:
-				vx_os = self._guess_property_from_scans(Virus.VX_PROPERTY_OS)
+				vx_os = self._guess_property_from_scans(Virus.VX_PROPERTY_OS)				
 			except:
 				vx_os = Virus.UNKNOWN
 				
@@ -443,114 +534,258 @@ class Virus(object):
 				vx_os = Virus.NormalizedLabels[vx_os.lower()]
 			self.set_os(vx_os)
 			
+		#**********************************************************************
+		# Attempts to figure the name of the malware based
+		# on AV idents.
+		#**********************************************************************
 		if (vx_name == Virus.UNKNOWN):
 			try:
-				vx_name = self._guess_property_from_scans(Virus.VX_PROPERTY_NAME)
+				vx_name = self._guess_property_from_scans(Virus.VX_PROPERTY_NAME)				
 			except:
 				vx_name = Virus.UNKNOWN
-			
-			
-			
+
 			self.set_name(vx_name)
 			
+		#**********************************************************************
+		# Attempts to figure the variant/strain of the malware based
+		# on AV idents.
+		#**********************************************************************
 		if (vx_variant == Virus.UNKNOWN):
 			try:
 				vx_variant = self._guess_property_from_scans(Virus.VX_PROPERTY_VERS)
 			except:
 				vx_variant = Virus.UNKNOWN
 				
-			self.set_version(vx_variant)
+			self.set_variant(vx_variant)
 
 	
 	def _guess_property_from_scans(self, _property):
 		self.logger.print_debug("Generating value for property '{:s}'.".format(_property))
-		if (self.is_not_detected()):
-			raise Exception(ERR_NO_DETECTION)
-		
+		vx_file = self.get_file()
+		#**********************************************************************
+		# Verifies if the given property is available in the idents,
+		# i.e. the property is CLASS, OS, NAME, or VARIANT.
+		#**********************************************************************
 		if (_property in Virus.VirusIdentItems):
-			if (self.is_detected_by(Virus.AV_KASPERSKY)):
-				kaspersky_ident = self.get_detection_by(Virus.AV_KASPERSKY)
-				self.logger.print_debug(INFO_DETECTED_BY.format(Virus.AV_KASPERSKY, kaspersky_ident))
-				name_fmt = Virus.AvNameFormats[Virus.AV_KASPERSKY]
-				id_items = parse(name_fmt, kaspersky_ident)
-				self.logger.print_debug("Value for '{:s}' found in Kaspersky ident: {:s}".format(_property, id_items[_property]))
+			#******************************************************************
+			# Checks if the default ident, i.e. an ident which usually contains
+			# all the information we need, is present in the list of idents.
+			# If so, use it to generate the value to the given property.
+			#******************************************************************
+			if (vx_file.is_detected_by(Virus.DEFAULT_IDENT_FORMAT)):
+				ident = vx_file.get_detection_by(Virus.DEFAULT_IDENT_FORMAT)
+				self.logger.print_debug(INFO_DETECTED_BY.format(Virus.DEFAULT_IDENT_FORMAT, ident))
+				name_fmt = Virus.AvNameFormats[Virus.DEFAULT_IDENT_FORMAT]
+				id_items = parse(name_fmt, ident)
 				return id_items[_property]
 			else:
-				scoreboard = {}
-				for (av, name_fmt) in Virus.AvNameFormats.iteritems():
-					if (self.is_detected_by(av)):
-						ident = self.get_detection_by(av)
-						id_items = parse(name_fmt, ident)
-						self.logger.print_debug("'{:s}' detected as '{:s}' by {:s}.".format(
-							self.get_file(), ident, av))
-						found = id_items.named
-						if (_property in id_items.named):
-							property_value = id_items[_property]
-							if (property_value in scoreboard):
-								scoreboard[property_value] += 1
-							else:
-								scoreboard[property_value] = 1
+			#
+			# Otherwise, iterate thru all the available idents and parse them.
+			# Retrieve the required property if available. Each time we 
+			# successfully retrieve the property, stored it in a dictionary
+			# along the number of times it was seen.
+			# At the end, consider the value most often observed in the idents,
+			# if there is a draw, select the first one.
+			#
+				try:
+					scoreboard = {}
+					for (av, name_fmt) in Virus.AvNameFormats.iteritems():
+						if (vx_file.is_detected_by(av)):
+							ident = vx_file.get_detection_by(av)
+							id_items = parse(name_fmt, ident)
 
-				if (len(scoreboard) > 0):
-					max_value = max(scoreboard.values())
-					best_value = [prop for prop,val in scoreboard.items() if val == max_value]
-					self.logger.print_debug(INFO_BEST_GUESS.format(_property, max_value, best_value[0]))
-					return best_value[0]
-				else:
-					raise Exception(ERR_NO_DETECTION)
+							if (id_items and _property in id_items.named and _property != None):
+								property_value = id_items[_property]
+								if (property_value in scoreboard):
+									scoreboard[property_value] += 1
+								else:
+									scoreboard[property_value] = 1
+								
+					if (len(scoreboard) > 0):
+						max_value = max(scoreboard.values())
+						best_value = [prop for prop,val in scoreboard.items() if val == max_value]
+						self.logger.print_debug(INFO_BEST_GUESS.format(_property, max_value, best_value[0]))
+						return best_value[0]
+					else:
+						raise Exception(ERR_NO_DETECTION)
+				except Exception as e:
+					print(e.message)
+					return Virus.UNKNOWN
 		else:
 			raise Exception(ERR_UNKNOWN_PROPERTY)
 	
-	def archive(self, _destination, _password, _7z):
-		if (self.files and len(self.files) > 0):
-			if not os.path.isfile(_7z):
-				raise Exception(ERR_7Z_NOTFOUND.format(_7z))
+	
+class VirusFile(object):
 
-			vx_file = self._create_archive_filename()	
-			vx_dst_file = os.path.join(_destination, os.path.basename(vx_file))
-			vx_dst_file += EXTENSION_7Z
-			self.logger.print_debug("Saving archive to '{:s}'.".format(vx_dst_file))
-			result = subprocess.call(
-				[_7z, "a",
-				 "-p{:s}".format(_password), "-y",
-				 vx_dst_file] +
-				self.files)
-			self.set_archive(vx_dst_file)		
-			return vx_dst_file
+	def __init__(self, _file):
+		#******************************************************************
+		# Verifies if the providesd argument is not null/empty.
+		#******************************************************************
+		if (_file and len(_file) > 0):
+			#**************************************************************
+			# Verifies if the file exists.
+			#**************************************************************
+			if os.path.isfile(_file):
+				#**************************************************************************
+				# Initialize the dictionary of identifications by different
+				# AV products.
+				#**************************************************************************
+				self.idents = {}
+				
+				self.file = _file
+				self.hashes =  {}
+				self._get_hashes()
+			else:	
+				raise FileNotFoundException(_file)
 		else:
-			raise Exception("No file specified.")
+			raise NullOrEmptyArgumentException()
 
+	def __str__(self):
+		return self.file
 
-	def md5(self):
-		file = self.get_file()
-		md5 = self.properties[Virus.VX_PROPERTY_MD5]
-		hash = hashlib.md5()
+	def add_ident(self, _av, _ident):
+		"""Adds a anti-virus vendor identification of the malware.
+		
+		This function adds an anti-virus vendot identification 
+		of the malware into a dictionary structure, the name of 
+		the vendor is used as the key and the value if the label/name
+		given to the malware. 
+		
+		Args:
+			_av: name of the anti-virus vendor
+			_ident: name of the malware.
+
+		Returns:
+			None.
+
+		Raises:
+			Exception if the name of the vendor or identification is null or 
+			empty. 
+		"""
+		if (_ident and len(_ident) > 0):
+			ident = _ident.lower().strip()
+			#**********************************************************************
+			# Verifies if the arguments are not null/empty.
+			#**********************************************************************
+			if (len(_av) > 0 and
+				len(ident) > 0 and 
+				ident != Virus.NOT_DETECTED):
+				self.idents[_av] = _ident
+			else:
+				raise Exception(ERR_EMPTY_NULL_ARGS)
+		else:
+			raise Exception(ERR_EMPTY_NULL_ARGS)			
+			
+	def set_antiviral_results(self, _detections = {}):
+		self.idents = _detections
+		
+	def get_antiviral_results(self):
+		return self.idents
+	
+	def is_undetected(self):
+		return len(self.idents) == 0
+	
+	def is_detected_by(self, _av):
+		if (self.idents and len(self.idents) > 0):
+			return (_av in self.idents)
+		return False
+	
+	def get_detection_by(self, _av):
+		if (self.idents and len(self.idents) > 0):
+			if (self.is_detected_by(_av)):
+				return self.idents[_av]
+		return None
+			
+	def _set_hash(self, _hash, _value):
+		self.hashes[_hash] = _value
+		
+	def _get_hash(self, _hash):
+		return self.hashes[_hash]
+	
+	def get_path(self):
+		return os.path.dirname(self.file)
+		
+	def get_file(self):
+		return os.path.basename(self.file)
+
+	def get_extension(self):
+		return os.path.splitext(self.file)[1]
+		
+	def get_absolute(self):
+		return os.path.abspath(self.file)
+	
+	def _get_hashes(self):
+		"""
+		Generates the hashes for the file and saves the results.
+		
+		This function will generates the MD5, SHA1 and SHA256 hashes of the
+		file. The results are saved into the properties of the object. The value
+		stored is the hexdigest of the hash in string format.
+		
+		Args:
+			None.
+			
+		Returns:
+			None.
+			
+		Raises:
+			None.
+		"""
+		file = self.get_absolute()
+		hash_md5  	= 	hashlib.md5()
+		hash_sha1 	= 	hashlib.sha1()
+		hash_sha256 =	hashlib.sha256()
+		
  		with open(file, "rb") as f:
   			for chunk in iter(lambda: f.read(4096), b""):
-				hash.update(chunk)
-		md5 = hash.hexdigest()		
-		#for file in files:
-		#	hash = hashlib.md5()
- 		#	with open(file, "rb") as f:
-  		#		for chunk in iter(lambda: f.read(4096), b""):
-		#			hash.update(chunk)
-		#	md5[file] = hash.hexdigest()
-		return md5
+				#
+				# Include more hashes here as needed.
+				#
+				hash_md5.update(chunk)
+				hash_sha1.update(chunk)
+				hash_sha256.update(chunk)
+				
+		md5 	=	hash_md5.hexdigest()
+		sha1 	= 	hash_sha1.hexdigest()
+		sha256 	= 	hash_sha256.hexdigest()
+		
+		self.set_md5(md5)
+		self.set_sha1(sha1)
+		self.set_sha256(sha256)
+		
+		
+	def set_md5(self, _value):
+		self._set_hash(Virus.VX_PROPERTY_MD5, _value)
+		
+	def get_md5(self):
+		return self._get_hash(Virus.VX_PROPERTY_MD5)
+		
+	def set_sha1(self, _value):
+		self._set_hash(Virus.VX_PROPERTY_SHA1, _value)
+		
+	def get_sha1(self):
+		return self._get_hash(Virus.VX_PROPERTY_SHA1)
+		
+	def set_sha256(self, _value):
+		self._set_hash(Virus.VX_PROPERTY_SHA256, _value)
+		
+	def get_sha256(self):
+		return self._get_hash(Virus.VX_PROPERTY_SHA256)
+	
+	def set_ssdeep(self, _ssdeep):
+		self._set_hash(Virus.VX_PROPERTY_SSDEEP, _ssdeep)
+		
+	def get_ssdeep(self):
+		return self._get_hash(Virus.VX_PROPERTY_SSDEEP)
 
-	def sha1(self):
-		files = self.get_files()
-		sha1 = self.properties[Virus.VX_PROPERTY_SHA1]
-		for file in files:
-			sha1[file] = ""
-		return sha1
+	def matches_md5(self, _md5):
+		return self.get_md5() == _md5
+		
+	def matches_sha1(self, _sha1):
+		return self.get_sha1() == _sha1
+		
+	def matches_sha256(self, _sha256):
+		return self.get_sha256() == _sha256	
 
-	def sha256(self):
-		files = self.get_files()
-		sha256 = self.properties[Virus.VX_PROPERTY_SHA256]
-		for file in files:
-			sha256[file] = ""
-		return sha256
-
-	def ssdeep(self):
-		ssdeep = self.properties[Virus.VX_PROPERTY_SSDEEP]
-		return ssdeep
+	def matches_ssdeep(self, _ssdeep):
+		return self.get_ssdeep() == _ssdeep			

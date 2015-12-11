@@ -36,51 +36,41 @@ __version__ = '.'.join(__version_info__)
 
 #//////////////////////////////////////////////////////////////////////////////
 # Imports Statements
+#
 import os
-import sys
-import simplejson
-import urllib
-import urllib2
 import os.path
-import platform
-import traceback
-
+#
 from Vault import Vault
 from Virus import Virus
 from Logger import Logger
 from DataSources import *
-from Hunters import *
 from Analyzers import *
 from Archivers import *
+#
+from VaultExceptions import *
+from Hunters import *
+#
 #//////////////////////////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////////////////////////
 # Constants
-ERR_FAILED_CONNECT_NET		=	"Failed to connect to the Internet: {:s}."
 ERR_MAX_ANALYZER_THREADS	=	"Maximum number of concurrent Analyzer objects reached."
-ENGINE_ERROR_INVALID_FILE	=	"Invalid file: {:s}."
-ENGINE_ERROR_ARCHIVER_404	=	"Could not find archiving program: {:s}."
-ENGINE_ERROR_UNKNOWN_TYPE	=	"Unknown file type: {:s}."
-ENGINE_ERROR_NO_METADATA	=	"No metadata found for malware '{:s}'."
-
 INFO_CONNECTED_INTERNET		=	"Successfully connected to the Internet."
 INFO_HUNT_THREADS_START		=	"Starting the hunters..."
 INFO_HUNT_MALCODE_STARTED	=	"Started Malc0de hunter."
 INFO_HUNT_LOCAL_STARTED		=	"Started local url hunter. Watching for files in '{:s}'."
+MSG_INFO_DOWNLOADING	=	u"Downloading {:s} from {:s}."
 DS_VIRUS_TOTAL = "VirusTotal"
-
-DEFAULT_DATA_SOURCE = DS_VIRUS_TOTAL
-
+UNALLOWED_CHARS_FILES	=	"/?<>\:*|\"^"
+DEFAULT_REPLACE_CHAR	=	"_"
 #//////////////////////////////////////////////////////////////////////////////
 
 class Engine(object):
 
 #******************************************************************************
-# Class Variables
+# Class Static Variables
 #
-# Maximum number of Analyzer threads that can
-# run concurrently.
-	MaxActiveAnalyzers = 1
+	DefaultDataSource = DS_VIRUS_TOTAL
 #
 # URL to use for testing Interner connectivity.
 	UrlTestInternet = "https://www.google.com/"
@@ -88,7 +78,10 @@ class Engine(object):
 #******************************************************************************
 
 
-	def __init__(self, _base, _vtapi, _logger=None):
+	def __init__(self, _base, _vtapi, 
+		_password=Vault.DefaultArchivePassword, 
+		_saveFileNoDetection=False,
+		_logger=None):
 		"""Initializes the engine, including the logger, vault and
 		other class variables.
 
@@ -102,6 +95,11 @@ class Engine(object):
 				be created.
 			_vtapi: 
 				The public API key used to make requests to VirusTotal.
+			_password:
+				Password to use on archive creation.
+			_saveFileNoDetection:
+				Specified whether analyzed files undetected by no AV
+				software should be saved in the archive.
 			_logger: 
 				Logger object to output information about program 
 				execution. If none provided, it will use sys.stdout
@@ -113,20 +111,30 @@ class Engine(object):
 		Raises:
 			None.
 		"""
+		#**************************************************************************
 		# Creates a new logger object.
+		#**************************************************************************
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger
+		#**************************************************************************
 		# Initializes an empty dictionary of data sources,
 		# adds the VirusTotal data source object to it.
+		#**************************************************************************
 		self.data_sources = {}
-		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(_vtapi)
-		# Initializes the list of active hunters and 
-		# analyzers threads.
-		self.active_hunters = []
-		self.active_analyzers = []
+		self.data_sources[DS_VIRUS_TOTAL] = VirusTotalSource(
+			_vtapi, _logger=self.logger)
+
+		#**************************************************************************
 		# Initializes a new vault object with the
-		# given base firectory.
-		self.vxvault = Vault(_base, self.logger)
+		# given base directory.
+		#**************************************************************************
+		self.vxvault = Vault(_base, _logger=self.logger)
+		
+		self.saveUndetectedFiles = _saveFileNoDetection
+		self.active_hunters = []
+		
+	def __str__(self):
+		return "<Engine>"
 		
 	def __repr__(self):
 		return "<VxVault Engine {:s}>".format(__version__)
@@ -168,7 +176,7 @@ class Engine(object):
 		if (_archiver):
 			self.vxvault.set_archiver(_archiver)
 		else:
-			raise Exception(ENGINE_ERROR_ARCHIVER_404.format(_program))
+			raise FileNotFoundException(_program)
 		
 	def get_archiver(self):
 		"""Returns the Archiver object currently used by the vault.
@@ -204,7 +212,7 @@ class Engine(object):
 			Exception if there was an error while creating 
 			the file system.
 		"""	
-		self.vxvault.file_system.create_filesystem()	
+		self.vxvault.create_vault()	
 		
 	def vault_is_created(self):
 		"""Verifies if the vault has been created at the base
@@ -219,13 +227,28 @@ class Engine(object):
 		Returns:
 			True if the vault has been created in the configured base
 			directory provided at the creation of the engine. Returns 
-			False otherwie.
+			False otherwise.
 
 		Raises:
 			None.
 		"""		
 		return self.vxvault.is_created()
-				
+
+	def get_vault(self):
+		"""
+		Returns the vault object used by the engine.
+		
+		Args:
+			None.
+		
+		Returns:
+			Vault object associated with the engine.
+			
+		Raises:
+			None.
+		"""
+		return self.vxvault
+		
 	def can_connect_internet(self):
 		"""Verifies if a connection to the Internet is available.
 
@@ -254,155 +277,379 @@ class Engine(object):
 			self.logger.print_debug(ERR_FAILED_CONNECT_NET.format(e.message))
 			return False;			
 
-	def start_hunters(self):
-		"""Initializes and start the hunting threads.
-
-		This function creates the Hunter threads and 
-		starts them. Each thread is kept in an array of
-		active threads.
-
-		Args:
-			None.
-
-		Returns:
-			None.
-		Raises:
-			None.
-		"""		
-		self.logger.print_debug(INFO_HUNT_THREADS_START)
-		#**********************************************************************
-		# Retrieve the pit folder from the vault.
-		#**********************************************************************
-		vx_pit = self.vxvault.get_pit()
-		
-		#**********************************************************************
-		# Create hunter objects
-		#**********************************************************************
-		hunter_malcode = MalcodeHunter(_pit=vx_pit, _logger=self.logger)
-		self.logger.print_debug(INFO_HUNT_MALCODE_STARTED)
-		hunter_local =  LocalHunter(
-			_pit=vx_pit, 
-			_dir=self.vxvault.file_system.get_urls_dump(),
-			_logger=self.logger)
-		self.logger.print_debug(INFO_HUNT_LOCAL_STARTED.format(
-			self.vxvault.file_system.get_urls_dump()))
-		#**********************************************************************
-		# Add hunters to the list of active hunter
-		# objects
-		#**********************************************************************
-		hunter_malcode.start()
-		hunter_local.start()
-		self.active_hunters.append(hunter_malcode)
-		self.active_hunters.append(hunter_local)
-		
-	def start_analyzers(self):
-		"""Initializes and start the analyzer threads.
-
-		This function creates the Analyzer threads and 
-		starts them. The Analyzer threads will look for new
-		executable into the pit folder of the vault. For each
-		executable found, the Analyzer will attempt to identify
-		the malware and archive it at the proper location in the
-		file system. Each Analyzer thread object is added to a 
-		list of active threads.
-		
-		Args:
-			None.
-
-		Returns:
-			None.
-		Raises:
-			None.
+	def add_http_file_virus(self, _url):
 		"""
-		#**********************************************************************
-		# Virus Total source.
-		#**********************************************************************
-		vt_source = self.data_sources[DS_VIRUS_TOTAL]
-		
-		#**********************************************************************
-		# Add each analyzer, which will be started once added.
-		#**********************************************************************
-		self._add_analyzer(vt_source)
-		
-	def _add_analyzer(self, _datasrc):
-		"""Create and start a new analyzer thread.
-
-		This function creates a new Analyzer thread with 
-		the given data source. Once created, it is started
-		and added to the list of active analyzer threads.
-		
-		Args:
-			_datasrc A data source object use for identification
-			of the malware found.
-
-		Returns:
-			None.
-		Raises:
-			Exception is the maximum number of analyzer threads reached.
-		"""
-		#**********************************************************************
-		# Check if a valid data source has been provided.
-		#**********************************************************************
-		if (_datasrc):
-			#******************************************************************
-			# Check if we have reach the maximum number of active
-			# threads has been reached.
-			#******************************************************************
-			if (len(self.active_analyzers) < Engine.MaxActiveAnalyzers):
-				#**************************************************************
-				# Create the Analyzer thread, add it to the list of active
-				# analyzers and start the thread.
-				#**************************************************************
-				vx_vault = self.vxvault
-				vx_analyzer = Analyzer(
-					_vxdata	=	_datasrc, 
-					_vault	=	vx_vault, 
-					_logger	=	self.logger)
-				self.active_analyzers.append(vx_analyzer)
-				vx_analyzer.start()
-			else:
-				raise Exception(ERR_MAX_ANALYZER_THREADS)
-		
-	def shutdown(self):
-		"""Stops all active threads and terminate any child process.
-
-		This function will stops all hunters, analyzers and other
-		threads stored in the threads list. If needed, it will also
-		reset any required variables or objects.
-		
-		Args:
-			None
-		Returns:
-			None.
-		Raises:
-			None.
-		"""
-		self.stop_analyzers()
-		self.stop_hunters()
-		
-	def stop_hunters(self):
-		"""Stops all active hunters threads.
-
-		This function will stops all active hunters listed in the
-		'active_hunters' list.
-		
-		Args:
-			None
-		Returns:
-			None.
-		Raises:
-			None.
-		"""
-		for vx_hunter in self.active_hunters:
-			vx_hunter.stop_hunting()
-			if (vx_hunter.is_alive()):
-				vx_hunter.join()
+			Downloads a file at the specified URL into the pit directory of the
+			vault and analyzes it prior to storing it in the vault.
 			
-	def stop_analyzers(self):
-		"""Stops all active analyzer threads.
+			This function will download a file specified by a HTTP/HTTPS URL and
+			save it to the "pit" directory. It will then proceed into 
+			retrieving scan information for the downloaded file and archive it
+			into the vault.
+			
+			TODO:
+			[ ] Test this function.
+			
+			Args:
+				_url: The URL of the file to download. Must start with HTTP.
+				
+			Returns:
+				None.
+				
+			Raises:
+				InvalidUrlException: If the provided URL is invalid.
+				NullOrEmptyArgumentException: if the URL or destination path is empty or null.
+				FileDownloadException: If the function failed to create the local file.				
+		"""
+		url = _url.strip()
+		if (url and len(url) > 0):
+			#******************************************************************
+			# Verifies if the URL provided is valid
+			#******************************************************************
+			if (url[0:4].lower() == "http"):
+				#******************************************************************
+				# Build the destination path of the file.
+				#******************************************************************
+				dst_path = self.vxvault.get_pit()
+				dst_file = url.split("/")[-1].strip()
+				dst_file = self.replace_chars_in_string(dst_file, 
+					UNALLOWED_CHARS_FILES, DEFAULT_REPLACE_CHAR)
+				dst = os.path.join(dst_path, dst_file)
+				if (os.path.exists(dst)):
+					raise FileExistsException(dst)
+				self.download_file(url, dst)
+				#******************************************************************
+				# Analyze the file downloaded after making sure it exists.
+				#******************************************************************
+				if (os.path.exists(dst)):
+					self.add_single_file_virus(dst)
+				else:
+					raise FileDownloadException()
+			else:
+				raise InvalidUrlException(url)
+		else:
+			raise NullOrEmptyArgumentException()
+		
+	def replace_chars_in_string(self, _string, _chars, _replace):
+		"""
+			Replaces characters in the given string by a user-defined
+			string.
+			
+			This functions will replace each instance of the characters specified
+			in the _chars string found inthe _string argument with the characters
+			specified in the _replace argument.
+			
+			Args:
+				_string: String containing chars to be replaced
+				_chars: String or array of characters to replaced.
+				_replace: String or character used as replacement.
+				
+			Returns:
+				None.
+			
+			Raises:
+				None.
+		"""
+		new_string = _string
+		for char in _chars:
+			if char in _string:	
+				new_string = new_string.replace()
+		return new_string
+	
+	def download_file(self, _url, _dst):
+		""" 
+			Downloads a file at the specified URL into the local filesystem.
+			
+			This function will download a file specified by a HTTP/HTTPS URL and
+			save it to the specified destination.
+			
+			Args:
+				_url: The URL of the file to download. Must start with HTTP.
+				_dst: Absolute path of the destination on the local file system.
+				
+			Returns:
+				None.
+				
+			Raises:
+				InvalidUrlException: If the provided URL is invalid.
+				NullOrEmptyArgumentException: if the URL or destination path is empty or null.
+				FileDownloadException: If the function failed to create the local file.
+		
+		"""
+		url = urllib.unquote(_url.strip())
+		if (url and len(url) > 0):
+			#******************************************************************
+			# Verifies if the URL provided is HTTP
+			# Todo:
+			#  [ ] Better URL validation function.
+			#******************************************************************
+			if (url[0:4].lower() == "http"):
+				self.logger.print_info(MSG_INFO_DOWNLOADING.format(_dst, url))
+				try:
+					urllib.urlretrieve (url, _dst)
+				except Exception as e:
+					raise FileDownloadException("{:s}: {:s}".format(_dst, e.message))
+			else:
+				raise InvalidUrlException(url)
+		else:
+			raise NullOrEmptyArgumentException()
+	
+	def add_single_file_virus(self, _file):
+		""" Adds a single file from the local system to the
+		vault.
+		
+		This function will add a single file to the vault. It will
+		analyze the file and attempt to identify it as a malware. Once
+		completed, it will archive the file in a 7zip archive and move
+		it into the vault based on the class and target OS.  This function
+		will remove the original file from the source.
+		
+		Args:
+			_file: The file to archive into the vault.
+			
+		Returns:
+			None.
+			
+		Raises:
+			Exception if provided file argument is null or empty. Will
+			raise exception if the file cannot be found, or cannot connect
+			to the Internet. Will also raise an exception if Analysis fails
+			or archiving fails.
+		"""
+		#**********************************************************************
+		# Verifies if the provided argument is valid.
+		#**********************************************************************
+		if (_file and len(_file) > 0):
+			#******************************************************************
+			# Checks if the file exists.
+			#******************************************************************
+			if (os.path.exists(_file)):
+				#**************************************************************
+				# Confirm if the file is not already stored in the vault
+				#**************************************************************
+				is_stored = self.file_is_archived(_file)
+				if (is_stored):
+					raise ArchiveExistsException(_file)
+				
+				#**************************************************************
+				# Attempts to extract malware identification of
+				# the given file.
+				#**************************************************************
+				datasrc = self.data_sources[DS_VIRUS_TOTAL]
+				analyzer = Analyzer(
+					_vxdata = datasrc,
+					_vault = self.vxvault,
+					_logger = self.logger)
+				vx = analyzer.analyze_file(_file)
+				if (vx):
+					if (vx.is_detected() or 
+						(vx.is_undetected and self.saveUndetectedFiles)):
+						#******************************************************
+						# Archives the file into the fault.
+						#******************************************************
+						self.vxvault.archive_file(vx)
+			else:
+				raise FileNotFoundException(_file)
+		else:
+			raise NullOrEmptyArgumentException()
 
-		This function will stops all active analyzers listed in the
-		'active_analyzers' list.
+	def add_single_dir_virus(self, _dir):
+		""" Add a malware containing multiple files contained in a single
+		directory.
+		
+		This function accepts a directory containing files of the same
+		malware, bundles it into an archive and move it to the vault.
+		
+		Args:
+			_dir: The directory containing the files of the malware.
+			
+		Returns:
+			None.
+			
+		Raises:
+			Exception if provided argument is null. Other exceptions on
+			error retrieving data from the internet, directory not found,
+			moving file to the vault or creating a new entry in the database.
+		
+		"""
+		#**********************************************************************
+		# Verifies if the provided argument is valid.
+		#**********************************************************************
+		if (_dir and len(_dir) > 0):
+			#******************************************************************
+			# Checks if the file exists.
+			#******************************************************************
+			if (os.path.isdir(_dir)):
+				#**************************************************************
+				# Check if the directory contains files
+				#**************************************************************
+				nb_files = len(os.listdir(_dir))
+				if (nb_files == 0):
+					raise Exception("Directory '{:s}' contains no file.".format(_dir))
+					
+				#**************************************************************
+				# Attempts to extract malware identification of
+				# the given file.
+				#**************************************************************
+				datasrc = self.data_sources[DS_VIRUS_TOTAL]
+				analyzer = Analyzer(
+					_vxdata = datasrc,
+					_vault = self.vxvault,
+					_logger = self.logger)
+				vx = analyzer.analyze_dir(_dir)
+				if (vx):
+					#**********************************************************
+					# Archives the file into the fault.
+					#**********************************************************
+					self.vxvault.archive_file(vx)
+			else:
+				raise FileNotFoundException(_dir)
+		else:
+			raise NullOrEmptyArgumentException()
+		
+	def add_multiple_virii_from_dir(self, _dir):
+		""" Adds all files in the specified directory and subdirectories
+		as individual malware.
+		
+		This function lists all files and subdirectories in the user-provided
+		directory and adds each individual file to the vault as a individual
+		malware. Subdirectories are considered as a single malware. All files in
+		the subdirectory are considered part of the same malware.
+		
+		Args:
+			_dir: The directory containing the malware
+			
+		Returns:
+			None
+			
+		Raises:
+			Exception on failure to find the directory, or if directory is empty.
+			Exception if fail to analyze, store file into the vault or record
+			the file into the database.
+		
+		"""
+		#**********************************************************************
+		# Verifies if the provided argument is valid.
+		#**********************************************************************
+		if (_dir and len(_dir) > 0):	
+			#******************************************************************
+			# Checks if the file exists.
+			#******************************************************************
+			if (os.path.isdir(_dir)):
+				#**************************************************************
+				# Check if the directory contains files
+				#**************************************************************
+				nb_files = len(os.listdir(_dir))
+				if (nb_files == 0):
+					raise Exception("Directory '{:s}' contains no file.".format(_dir))
+					
+				datasrc = self.data_sources[DS_VIRUS_TOTAL]
+				analyzer = Analyzer(
+					_vxdata = datasrc,
+					_vault = self.vxvault,
+					_logger = self.logger)
+
+				for root, dirs, files in os.walk(_dir):
+					for name in files:
+						vx_file = os.path.join(root, name)
+						#******************************************************
+						# Confirm if the file is not already stored in the 
+						# vault
+						#******************************************************
+						is_stored = self.file_is_archived(vx_file)
+						if (is_stored):
+							raise Exception(ERR_FILE_ALREADY_EXISTS.format(_file))						
+						self.logger.print_debug("Adding file '{:s}'...".format(vx_file))
+						vx = analyzer.analyze_file(vx_file)
+						if (vx):
+						#******************************************************
+						# Archives the file into the fault.
+						#******************************************************
+							self.vxvault.archive_file(vx)
+						#**********************************************************
+						# Verifies if we are allowed to make a new request to
+						# the data source.
+						#**********************************************************
+						next_run = datasrc.get_next_allowed_request()
+						self.logger.print_debug(MSG_INFO_NEXT_RUN.format(next_run))						
+						while (datetime.now() < next_run):
+							time.sleep(3)
+				
+					for dir in dirs:
+						vx_dir = os.path.join(root, dir)
+						#**************************************************************
+						# Check if the directory contains files
+						#**************************************************************
+						nb_files = len(os.listdir(vx_dir))
+						if (nb_files == 0):
+							raise Exception("Directory '{:s}' contains no file.".format(vx_dir))
+
+						vx = analyzer.analyze_dir(vx_dir)
+						if (vx):
+							#**********************************************************
+							# Archives the file into the fault.
+							#**********************************************************
+							self.vxvault.archive_file(vx)
+						#**********************************************************
+						# Verifies if we are allowed to make a new request to
+						# the data source.
+						#**********************************************************
+						next_run = datasrc.get_next_allowed_request()
+						self.logger.print_debug(MSG_INFO_NEXT_RUN.format(next_run))						
+						while (datetime.now() < next_run):
+							time.sleep(3)
+							
+			else:
+				raise FileNotFoundException(_dir)
+		else:
+			raise NullOrEmptyArgumentException()
+			
+	def start_malware_hunt(self):
+		"""
+		
+		"""
+		
+		hunt_malcode = MalcodeHunter(
+			_engine=self,
+			_logger=self.logger)
+		
+		self.active_hunters.append(hunt_malcode)
+		
+		for hunter in self.active_hunters:
+			hunter.start()
+	
+	def stop_malware_hunt(self):
+		"""
+		
+		"""
+		for hunter in self.active_hunters:
+			hunter.stop_hunting()
+			hunter.join()
+			
+	def file_is_archived(self, _file):
+		""" Verifies if the given file is already stored in one of the
+		archive in the vault.
+		
+		This function is a shortcut to VaultDatabase.file_exists.
+		
+		Args:
+			_file: Absolute path of the file to verify.
+			
+		Returns:
+			True if the SHA1 hash of the given file is found in the Files table
+			of the database. False otherwise.
+			
+		Raises:
+			Exception if null or empty arguments. Raise exception if given
+			file is not found.
+			
+		"""
+		return self.vxvault.file_is_archived(_file)
+			
+	def shutdown(self):
+		"""Clean up function for the engine.
+		
+		This function will manage program termination.
 		
 		Args:
 			None
@@ -411,7 +658,5 @@ class Engine(object):
 		Raises:
 			None.
 		"""
-		for vx_analyzer in self.active_analyzers:
-			vx_analyzer.stop_analysis()
-			if (vx_analyzer.is_alive()):
-				vx_analyzer.join()
+		pass
+		

@@ -44,15 +44,12 @@ from Virus import Virus
 from Logger import Logger
 from Archivers import SevenZipArchiver
 from VaultDatabase import VaultDatabase
+from VaultExceptions import *
 #//////////////////////////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////////////////////////
 # Constants
-ERR_FAILED_CREATE_DB = "Failed to create database file at '{:s}'."
-ERR_DIR_NOT_FOUND = "Could not find directory '{:s}'."
-ERR_DB_FILE_NOT_FOUND= "Could not find database file '{:s}'."
 ERR_INVALID_OS_CLASS = "Invalid or empty operating system/malware class provided."
-VAULT_ERROR_INVALID_BASE_DIR = "Invalid base directory: '{:s}'."
 
 INFO_NEW_BASE	=	"Relocated file system to '{:s}'."
 DEFAULT_ARCHIVE_PASSWORD = "infected"
@@ -65,10 +62,10 @@ class Vault(object):
 
 	# Password used to archive malware.
 	# TODO: 
-	#	[ ] User-provided from command line.
+	#	[X] User-provided from command line.
 	DefaultArchivePassword = DEFAULT_ARCHIVE_PASSWORD
 
-	def __init__(self, _base, _logger=None):
+	def __init__(self, _base, _password="", _logger=None):
 		"""Initializes the Vault and the FileSystem objects.
 
 		Creates a new Vault object which is used to interface
@@ -98,6 +95,12 @@ class Vault(object):
 		# base.
 		self.file_system = FileSystem(_base, _logger=_logger)
 		#
+		# Initializes the database.
+		#
+		self.database = VaultDatabase(
+			_file=self.file_system.get_db_file(),
+			_logger=self.logger)
+		#
 		# Sets the archiver object for storing files in
 		# the vault.
 		#
@@ -110,6 +113,23 @@ class Vault(object):
 	def __repr__(self):
 		return "<Vault '{:s}' @{:s}>".format(
 			self.get_name(), self.file_system.get_base())
+		
+	def create_vault(self, _overwrite=False):
+		""" Creates the database and filesystem of the vault.
+		
+		This function will first create the database file and schema. It
+		will then create the filesystem to store the files. 
+		
+		Args:
+			_overwrite: Optional. If set to true, will create the
+			database and filesystem even if it already exists.
+		Returns:
+			None.
+		Raises:
+			None.
+		"""
+		self.database.create_database(_overwrite)
+		self.file_system.create_filesystem(_overwrite)
 		
 	def is_created(self):
 		"""Verifies if this vault has already been created
@@ -129,7 +149,9 @@ class Vault(object):
 		Raises:
 			None.
 		"""	
-		return self.file_system.filesystem_exists()
+		fs_is_created = self.file_system.filesystem_exists()
+		db_is_created = self.file_system.database_file_exists()
+		return fs_is_created and db_is_created
 		
 	def get_pit(self):
 		"""Retrieves the absolute path of the SUBFOLDER_PIT
@@ -165,7 +187,32 @@ class Vault(object):
 			Exception if the provided Virus object is null.
 		"""	
 		self.file_system.archive_file(_vx)
+		self.database.add_malware(_vx)
 
+	def file_is_archived(self, _file):
+		""" Verifies if the given file is already stored in one of the
+		archive in the vault.
+		
+		This function is a shortcut to VaultDatabase.file_exists.
+		
+		Args:
+			_file: Absolute path of the file to verify.
+			
+		Returns:
+			True if the SHA1 hash of the given file is found in the Files table
+			of the database. False otherwise.
+			
+		Raises:
+			Exception if null or empty arguments. Raise exception if given
+			file is not found.
+			
+		"""
+		self.logger.print_info("Verifying if file '{:s}' is already archived.".format(_file))
+		if (_file and len(_file) > 0):
+			return self.database.file_exists(_file)
+		else:
+			raise Exception("No args")
+		
 	def set_archiver(self, _archiver):
 		""" Sets the Archiver to be used by the Vault to archive and 
 		compress malware into the filesystem.
@@ -328,10 +375,10 @@ class FileSystem(object):
 		#**********************************************************************
 		self.set_base(_base)
 		
-		#
+		#**********************************************************************
 		# Create the database of the vault.
-		#
-		self.Database = VaultDatabase(self.get_db_file)
+		#**********************************************************************
+		self.database = VaultDatabase(self.get_db_file)
 		
 		#**********************************************************************
 		# Specify the first level of directories to create in the base
@@ -363,7 +410,7 @@ class FileSystem(object):
 			is not a directory.
 		"""			
 		if not os.path.isdir(_base):
-			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(_base))
+			raise FileNotFoundException(_base)
 		self.logger.print_debug(INFO_NEW_BASE.format(_base))
 		self.base = _base
 		
@@ -408,15 +455,7 @@ class FileSystem(object):
 		if (_archiver):
 			self.archiver = _archiver
 		else:
-			raise Exception("Archiver object cannot be null.")
-	
-	def create_db_file(self):
-		db_file = self.get_db_file()
-		with open(db_file, "w") as f:
-			pass
-		if (not os.path.isfile(db_file)):
-			raise Exception(ERR_FAILED_CREATE_DB.format(db_file))
-	
+			raise NullOrEmptyArgumentException()
 	
 	def get_db_file(self):
 		"""Returns the absolute path of the database file.
@@ -452,6 +491,24 @@ class FileSystem(object):
 			None.
 		"""	
 		return os.path.join(self.get_base(), FileSystem.SUBFOLDER_PIT)
+	
+	def database_file_exists(self):
+		""" Verifies that the database file exists on the filesystem.
+		
+		This functions verifies if the database file exists on the
+		file systems. It does not verify that the actual database
+		schema is created.
+		
+		Args:
+			None.
+			
+		Returns:
+			True, if the database file exists, false otherwise.
+			
+		Raises:
+			None.
+		"""
+		return os.path.exists(self.get_db_file())
 	
 	def get_urls_dump(self):
 		return os.path.join(self.get_pit(), FileSystem.SUBFOLDER_URLS)
@@ -498,7 +555,7 @@ class FileSystem(object):
 		else:
 			raise Exception(ERR_INVALID_OS_CLASS)
 	
-	def create_filesystem(self):
+	def create_filesystem(self,_overwrite=False):
 		"""Creates the file system on the disk.
 
 		This function will create the file system on the disk
@@ -515,29 +572,27 @@ class FileSystem(object):
 			while creating the directories.
 		"""	
 		if (self.get_base() and os.path.isdir(self.get_base())):
-			# Create database file at base directory
-			self.create_db_file()
 			# The first level of directories are operating
 			# systems.
-			systems = self.OperatingSystems
-			for system in systems:
+			for (os_dir, class_dirs) in FileSystem.FileStructure.iteritems():
 				# Create the directory of the operating system
 				# if it is not already existing.
-				directory = os.path.join(self.get_base(), system)
-				if not os.path.exists(directory):
+				directory = os.path.join(self.get_base(), os_dir)
+				if not os.path.exists(directory) or _overwrite:
 					os.makedirs(directory)
 					self.logger.print_debug("Created '{:s}'".format(directory))
+				#
 				# Get the subdirectories for this operating system.
-				subdirectories = self.FileStructure[system]
-				for s in subdirectories:
+				#
+				for s in class_dirs:
 					# Create each subdirectory if it is not already
 					# existing.
 					subdir = os.path.join(directory, s)
-					if not os.path.exists(subdir):
+					if not os.path.exists(subdir) or _overwrite:
 						os.makedirs(subdir)
 						self.logger.print_debug("Created '{:s}'".format(subdir))
 		else:
-			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(self.base))
+			raise FileNotFoundException(self.base)
 	
 	def filesystem_exists(self):
 		"""Verifies if this vault has already been created
@@ -562,10 +617,8 @@ class FileSystem(object):
 			Exception if the configured base directory is empty or invalid.
 		"""	
 		if (self.get_base() and os.path.isdir(self.get_base())):
-			# Gets the absolute path of the database file.
-			db_file = self.get_db_file()
 			# Verifies if the file exists.
-			if (os.path.isfile(db_file)):
+			if (self.database_file_exists()):
 				# Start checking if every directory exists.
 				for (os_dir, class_dirs) in FileSystem.FileStructure.iteritems():
 					os_dir = os.path.join(self.get_base(), os_dir)
@@ -581,12 +634,12 @@ class FileSystem(object):
 								self.logger.print_debug(ERR_DIR_NOT_FOUND.format(class_dir))
 								return False
 			else:
-				self.logger.print_debug(ERR_DB_FILE_NOT_FOUND.format(db_file))
+				self.logger.print_debug(ERR_DB_NO_DB_FILE.format(self.get_db_file()))
 				return False
 			
 			return True
 		else:
-			raise Exception(VAULT_ERROR_INVALID_BASE_DIR.format(self.base))
+			raise FileNotFoundException(self.base)
 			
 	def archive_file(self, _vx, _password=Vault.DefaultArchivePassword):
 		"""Archives the malware into the file system.
@@ -627,29 +680,40 @@ class FileSystem(object):
 			# of the malware.
 			#
 			dst_path = self.get_directory(vx_os, vx_class)
+			
 			#
 			# Move the file from its current location to the
 			# vault.
 			#
-			src_file = _vx.get_file()
-			dst_file = os.path.join(dst_path, _vx.get_archive_name()) + self.archiver.get_extension()
-			print(INFO_MOVING_FILE.format(src_file, dst_file))
-			self.archiver.archive(_vx, dst_file)
-			self.logger.print_debug(INFO_MOVING_FILE.format(src_file, dst_file))
-			
+			_vx.set_password(_password)
+			archive_name = self.archiver.archive(_vx, dst_path)
+
 			#
 			# Delete the original files from the pit. Prevents
 			# from re-analyzing them and saves space.
 			#
-			files_to_del = _vx.get_files()
+			files_to_del = [f.get_absolute() for f in _vx.get_files()]
 			for file_to_del in files_to_del:
-				self.logger.print_debug("Deleting '{:s}'...".format(file_to_del))
+				self.logger.print_warning("Deleting '{:s}'...".format(file_to_del))
 				os.remove(file_to_del)
-			
-			#
-			# TODO:
-			# [ ] Add to database
-			_vx.set_password(Vault.DefaultArchivePassword)
-			
+
 		else:
-			raise Exception("Invalid malware object: Virus object cannot be null.")
+			raise NullOrEmptyArgumentException()
+
+	def archive_exists(self, _archive):
+		""" Verifies if the given archive already exists on the file system.
+		
+		This function will verify if the specified file is already created on 
+		the file system solely based on the absolute path and filename.
+		
+		Args:
+			_archive: Absolute path of the archive.
+			
+		Returns:
+			True if a file with a similar name and path was found in the vault,
+			False otherwise.
+			
+		Raises:
+			None.
+		"""
+		return os.path.exists(_archive)

@@ -46,18 +46,15 @@ from DataSources import *
 #//////////////////////////////////////////////////////////////////////////////
 # Globals and Constants
 #
-# Error messages
-#
-ERR_FAIL_DATA_RET		=	"Could not retrieve data for '{:s}': {:s}"
-ERR_INVALID_DEST_DIR	=	"Invalid destination folder: '{:s}'."
-ERR_NULL_DATA_SOURCE	=	"Malware data source cannot be null."
-#
 # Information/Debug messages
 #
 MSG_INFO_NEXT_RUN		=	"Next run: {:%H:%M:%S}"
 MSG_INFO_ANALYZING		=	"Analyzing '{:s}' ..."
 WARN_NODATA_FOUND		=	"No data retrieved for '{:s}'."
 INFO_THREAD_SHUTDOWN	=	"Analysis completed. Thread '{:s}' terminated."
+#
+DEFAULT_THREAD_NAME		=	"vx_pit_analyzer"
+DEFAULT_WAIT_DELAY		=	10
 #
 #//////////////////////////////////////////////////////////////////////////////
 #
@@ -66,10 +63,10 @@ INFO_THREAD_SHUTDOWN	=	"Analysis completed. Thread '{:s}' terminated."
 class Analyzer(threading.Thread):
 
 	# Default name for thread.
-	DefaultThreadName  = "vx_pit_analyzer"
+	DefaultThreadName  = DEFAULT_THREAD_NAME
 
 	# Default sleep time for the thread in seconds.
-	DefaultWaitDelay = 10
+	DefaultWaitDelay = DEFAULT_WAIT_DELAY
 	
 	def __init__(self, _vxdata, _vault, _logger=None):
 		#**********************************************************************
@@ -99,7 +96,7 @@ class Analyzer(threading.Thread):
 		if (_vault):
 			self.vault = _vault
 		else:
-			raise Exception(ERR_INVALID_DEST_DIR.format(_dst))
+			raise NullOrEmptyArgumentException()
 		
 		#**********************************************************************
 		# Set data source, raise exception if none provided.
@@ -107,7 +104,7 @@ class Analyzer(threading.Thread):
 		if (_vxdata != None):
 			self.datasource = _vxdata
 		else:
-			raise Exception(ERR_NULL_DATA_SOURCE)
+			raise NullOrEmptyArgumentException()
 		
 	def stop_analysis(self):
 		"""Sets the stop flag to shutdown the thread.
@@ -151,86 +148,91 @@ class Analyzer(threading.Thread):
 		self.analyze = True
 		vx_pit = self.vault.get_pit()
 		while (self.analyze):
-			#******************************************************************
-			# Get the files currently in the pit. 
-			#******************************************************************
-			vx_in_pit = []
-			for f in os.listdir(vx_pit):
-				vx_file = os.path.join(vx_pit, f)
-				if os.path.isfile(vx_file):
-					vx_in_pit.append(vx_file)
-					
-			#******************************************************************
-			# Verifies if the pit contains any file.
-			#******************************************************************
-			if (len(vx_in_pit) > 0):
-				#**************************************************************
-				# Start analyzing files found in the pit.
-				#**************************************************************
-				for vx_file in vx_in_pit:
-					self.logger.print_info(MSG_INFO_ANALYZING.format(vx_file))
-					
-					#**********************************************************
-					# Create a Virus object to manipulate the malware.
-					#**********************************************************
-					vx = Virus()
-					vx.add_file(vx_file)
-					vx.add_size(os.path.getsize(vx_file))
-					
-					try:
-						vx_dst_file = ""
-						#******************************************************
-						# Retrieve the information about the file from the
-						# given data source.
-						#******************************************************
-						self.datasource.retrieve_metadata(vx)
-						vxdata = vx.get_antiviral_results()
+			
+			vx_objects = self.analyze_dir(vx_pit)
 						
-						#*******************************************************
-						# Verifies if data was retrieved from the data source.
-						#*******************************************************
-						if (vxdata and len(vxdata) > 0):
-							self.logger.print_debug("File:{:s}:".format(vx_file))
-							
-							#***************************************************
-							# Only store identifications with useful information,
-							# discard data without idents.
-							#***************************************************
-							for (av, detection) in vxdata.iteritems():
-								if (detection.lower().strip() != Virus.NOT_DETECTED):
-									self.logger.print_debug("\t{:s}:{:s}".format(av, detection))
-									vx.add_ident(av, detection)
-							
-						else:
-							self.logger.print_warning(WARN_NODATA_FOUND.format(vx_file))
-							
-						#******************************************************
-						# Archive the malware into the vault.
-						#******************************************************
-						self.vault.archive_file(vx)
-						
-					except Exception as e:
-						self.logger.print_error(ERR_FAIL_DATA_RET.format(vx_file, str(e.message)))
-						
-					#**********************************************************
-					# The next_run variable holds the time of the next time the 
-					# analyzer will move on to the other file.Some data sources 
-					# allows only abs limited number of requests per 
-					# minute/hour/etc...
-					#**********************************************************
-					self.next_run = self.datasource.get_next_allowed_request()
-					self.logger.print_debug(MSG_INFO_NEXT_RUN.format(self.next_run))
-					#**********************************************************
-					# Verifies if the thread should resume with the analysis,
-					# exit, or sleep some more.
-					#**********************************************************
-					while (datetime.now() < self.next_run and self.analyze):
-						time.sleep(Analyzer.DefaultWaitDelay)
+			#**********************************************************
+			# The next_run variable holds the time of the next time the 
+			# analyzer will move on to the other file.Some data sources 
+			# allows only abs limited number of requests per 
+			# minute/hour/etc...
+			#**********************************************************
+			self.next_run = self.datasource.get_next_allowed_request()
+			self.logger.print_debug(MSG_INFO_NEXT_RUN.format(self.next_run))
+			#**********************************************************
+			# Verifies if the thread should resume with the analysis,
+			# exit, or sleep some more.
+			#**********************************************************
+			while (datetime.now() < self.next_run and self.analyze):
+				time.sleep(Analyzer.DefaultWaitDelay)
 
-					if (not self.analyze):
-						break
+			if (not self.analyze):
+				break
 			else:
 				self.logger.print_debug("No files found in pit.")
 				time.sleep(Analyzer.DefaultWaitDelay)
 				
 		self.logger.print_warning(INFO_THREAD_SHUTDOWN.format(self.name))
+		
+	def analyze_dir(self, _dir):
+		""" Creates a Virus object containng all files in the specifiled directory
+		and retrieves metadata from each file found.
+		
+		Args:
+			_dir: The directory containing files to analyze.
+			
+		Returns:
+			Virus object containing information retrieved from the data
+			source.
+			
+		Raises:
+			Exception if the provided directory is null or empty.
+		
+		"""
+		if (_dir and len(_dir) > 0):
+			self.logger.print_info(MSG_INFO_ANALYZING.format(_dir))
+			
+			vx = Virus(_logger=self.logger)
+			vx.add_dir(_dir)
+			self.datasource.retrieve_metadata(vx)
+			return vx
+		else:
+			raise NullOrEmptyArgumentException()
+			
+	def analyze_file(self, _file):
+		""" Creates a Virus object with metadata retrieved from the given
+		data source of the analyzer. 
+		
+		Args:
+			_file: The file to analyze.
+			
+		Returns:
+			Virus object containing information retrieved from the data
+			source.
+			
+		Raises:
+			Exception if the provided file is null or empty.
+		
+		"""
+		if (_file and len(_file) > 0):
+			self.logger.print_info(MSG_INFO_ANALYZING.format(_file))
+			
+			#**********************************************************
+			# Create a Virus object to manipulate the malware.
+			#**********************************************************
+			vx = Virus(_logger=self.logger)
+			vx.add_file(_file)
+
+			vx_dst_file = ""
+			#******************************************************
+			# Retrieve the information about the file from the
+			# given data source.
+			#******************************************************
+			try:
+				self.datasource.retrieve_metadata(vx)
+			except:
+				pass
+			return vx
+		else:
+			raise NullOrEmptyArgumentException()
+

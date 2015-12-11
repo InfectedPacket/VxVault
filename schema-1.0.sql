@@ -7,7 +7,9 @@ DROP TABLE IF EXISTS Archives ;
 CREATE TABLE IF NOT EXISTS Archives (
   archive_id INTEGER PRIMARY KEY AUTOINCREMENT,
   filename VARCHAR(512) NOT NULL,
-  password VARCHAR(64) NOT NULL
+  path	VARCHAR(1024) NOT NULL,
+  hash CHAR(60) NOT NULL UNIQUE,
+  password VARCHAR(64)
  );
 
 CREATE INDEX filename_UNIQUE ON Archives(filename);
@@ -20,13 +22,15 @@ DROP TABLE IF EXISTS Files;
 CREATE TABLE IF NOT EXISTS Files (
   file_id INTEGER PRIMARY KEY AUTOINCREMENT,
   filename VARCHAR(128) NOT NULL,
-  md5 CHAR(32) NOT NULL,
-  sha1 CHAR(60) NOT NULL,
+  md5 CHAR(32) NOT NULL UNIQUE,
+  sha1 CHAR(60) NOT NULL UNIQUE,
+  sha256 CHAR(64) UNIQUE,
+  ssdeep VARCHAR(512) UNIQUE,
   archive_id INTEGER UNSIGNED NOT NULL,
     FOREIGN KEY (archive_id)
     REFERENCES Archives (archive_id)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION
+    ON UPDATE CASCADE
 );
 
 CREATE INDEX archive_id_INDEX ON Files(archive_id);
@@ -54,12 +58,12 @@ CREATE TABLE IF NOT EXISTS Idents (
   PRIMARY KEY (file_id, av_id),
   FOREIGN KEY (file_id)
     REFERENCES Files(file_id)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
   FOREIGN KEY (av_id)
     REFERENCES AVs(av_id)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION);
+    ON DELETE CASCADE
+    ON UPDATE CASCADE);
 
 CREATE INDEX ident_avid_INDEX on Idents(av_id);
 	
@@ -121,6 +125,10 @@ INSERT INTO AVs (name) VALUES ('TotalDefense');
 INSERT INTO AVs (name) VALUES ('ViRobot');
 INSERT INTO AVs (name) VALUES ('Zoner');
 INSERT INTO AVs (name) VALUES ('nProtect');
+INSERT INTO AVs (name) VALUES ('MicroWorld-eScan');
+INSERT INTO AVs (name) VALUES ('Malwarebytes');
+INSERT INTO AVs (name) VALUES ('TrendMicro-HouseCall');
+INSERT INTO AVs (name) VALUES ('McAfee-GW-Edition');
 
 COMMIT;
 

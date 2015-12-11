@@ -38,11 +38,17 @@ import os
 import abc
 import sys
 import subprocess
+#
+from VaultExceptions import *
+#
 #//////////////////////////////////////////////////////////////////////////////
+#
+# Constants
+#
 DEFAULT_WIN_7ZIP_PATH = "C:\\Program Files\\7-Zip\\7z.exe"
 DEFAULT_LINUX_7ZIP_PATH = "/usr/bin/7z"
-ERR_7Z_NOTFOUND = "Could not find archiving program: {:s}."
-EXTENSION_7Z		= ".7z"
+EXTENSION_7Z		= "7z"
+#
 #//////////////////////////////////////////////////////////////////////////////
 
 class Archiver(object):
@@ -54,15 +60,25 @@ class Archiver(object):
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger	
 
+		#**********************************************************************
+		# Verifies the path to the archiver is valid
+		#**********************************************************************
 		if (len(_archiver) > 0 and os.path.isfile(_archiver)):
 			self.archiver = _archiver
 		else:
-			raise Exception("Invalid path to archiver program: '{:s}'.".format(_archiver))
+			raise FileNotFoundException(_archiver)
 				
+		#**********************************************************************
+		# Sets the password to use for the generated archives.
+		#**********************************************************************
 		self.password = _password
 
 	@abc.abstractmethod
 	def archive(self, _vx, _dst_path):
+		return
+		
+	@abc.abstractmethod
+	def get_extension(self):
 		return
 		
 class SevenZipArchiver(Archiver):
@@ -80,17 +96,53 @@ class SevenZipArchiver(Archiver):
 	def get_extension(self):
 		return SevenZipArchiver.ArchiveExtension
 		
-	def archive(self, _vx, _dst_file):
-		vx_arch_files = _vx.get_files()
-		vx_arch_file = _dst_file
+	def archive(self, _vx, _dstpath):
+		""" Creates a 7zip archive file containing all files contained in the
+		provided Virus object at the given destination path.
 		
-		self.logger.print_debug("Saving archive to '{:s}'.".format(vx_arch_file))
-		print("Saving archive to '{:s}'.".format(vx_arch_file))
-		result = subprocess.call(
-			[self.archiver, "a", "-t7z", "-p{:s}".format(self.password), "-y", vx_arch_file] +
-			vx_arch_files, shell=False)
+		This function will archive the files contained in the Virus object into a
+		7zip archive. The archive will be created at the provided destination.
 		
-		if (result != 0):
-			raise Exception("Error while creating the archive.")
+		Args:
+			_vx: The virus object containing the files to be archived.
+			
+		Returns:
+			None.
+			
+		Raises:
+			ArchiveCreationException; if an error occurs while creating
+			the archive.
+			NullOrEmptyArgumentException; if one or more of the provided
+			argument is null or empty.
+		"""
 		
-		return vx_arch_file
+		if (_vx and _dstpath and len(_dstpath) > 0):
+		
+			vx_arch_files = [ f.get_absolute() for f in _vx.get_files()]
+			vx_arch_file = os.path.join(_dstpath, _vx.generate_archive_name(self.get_extension()))
+			
+			#**********************************************************************
+			# Verifies if the Virus objects contains file to be
+			# archive.
+			#**********************************************************************
+			if (len(vx_arch_files) > 0):
+				#******************************************************************
+				# Calls 7zip from the system to create the archive.
+				#******************************************************************
+				result = subprocess.call(
+					[self.archiver, "a", "-t7z", "-p{:s}".format(self.password), "-y", vx_arch_file] +
+					vx_arch_files, shell=False)
+				self.logger.print_success(INFO_ARCHIVE_CREATED.format(vx_arch_file))
+			else:
+				raise ArchiveCreationException(ERR_VIRUS_NO_FILE)
+			
+			if (result != 0):
+				raise ArchiveCreationException()
+			#**********************************************************************
+			# Sets the archive created as one of the properties
+			# of the Virus object.
+			#**********************************************************************
+			_vx.set_archive(vx_arch_file)
+			return vx_arch_file
+		else:
+			raise NullOrEmptyArgumentException()

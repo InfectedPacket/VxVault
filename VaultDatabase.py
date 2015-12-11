@@ -37,52 +37,85 @@ import sys
 import sqlite3
 import os.path
 
-from Virus import Virus
+from Virus import Virus, VirusFile
 from Logger import Logger
+from VaultExceptions import *
 #//////////////////////////////////////////////////////////
 # Constants
-ERR_NULL_OR_EMPTY	=	"Value for variable '{:s}' cannot be null or empty."
-ERR_DB_FILE_EXIST	=	"Vault database already exists in folder."
+ERR_NO_ARCHIVE_NAME = "No archive name has been defined for Virus object."
+ERR_DB_SCHEMA_EMPTY = "Database schema file is empty."
+
+TBL_FILES = "Files"
+COL_FILES = "filename, md5, sha1, sha256, archive_id"
 
 SQL_INSERT = "INSERT INTO {table:s}({columns:s}) VALUES({values:s})"
-SQL_NEW_ARCHIVE_VALUES = "'{filename:s}','{password:s}'"
-SQL_NEW_FILE_VALUES = "'{filename:s}','{md5:s}','{sha1:s}'"
+SQL_NEW_ARCHIVE_VALUES = "'{filename:s}', '{path:s}', '{hash:s}', '{password:s}'"
+SQL_NEW_FILE_VALUES = "'{filename:s}','{md5:s}','{sha1:s}','{sha256:s}',{archive:d}"
+SQL_SELECT_FILE_BY_SHA = "SELECT * FROM Files WHERE sha1 ='{:s}'"
 #//////////////////////////////////////////////////////////
 # Classes
 class VaultDatabase(object):
 
-	DEFAULT_VAULT_DB_FILE	=	"vxvault.db"
+	DEFAULT_VAULT_DB_FILE	=	".vxvault.db"
 
-	DefaultSchemaFile = "./db/schema-1.0.sql"
+	DefaultSchemaFile = "./schema-1.0.sql"
 
 	def __init__(self, _file, _schema=DefaultSchemaFile, _logger=None):
+		#**********************************************************************
 		# Creates a new logger object.
+		#**********************************************************************
 		if _logger == None: self.logger = Logger(sys.stdout)
 		else: self.logger = _logger
 		
+		#**********************************************************************
+		# Specifies the sqlite database file.
+		#**********************************************************************
 		self.set_db_file(_file)
+		#**********************************************************************
+		# Specifies the SQL database schema file.
+		#**********************************************************************
 		self.db_schema_file = _schema
 		
 	def create_database(self, _overwrite=False):
+		""" Creates the database from the SQL schema provided to the
+		VaultDatabase.
+		
+		This functions creates the database or overwrite the database
+		file if the _overwrite argument is set to True. 
+		
+		Args:
+			_overwrite; Recreates the database schema if it already
+			exists.
+			
+		Returns:
+			None.
+			
+		Raises:
+			Exception if database file already exists and _overwrite is
+			set to False. Raises an exception if the database schema file
+			is not found or the file is empty. Raises an exception if
+			there is a SQL error while creating the schema.
+		
+		"""
 		#**********************************************************************
 		# Verify if the sqllite file has been set
 		# if not, exit.
 		#**********************************************************************
 		if (len(self.db_file) <= 0):
-			raise Exception("No file specified for database.")
+			raise NoDatabaseFileSpecifiedException()
 
 		#**********************************************************************
 		# Check if a valid database schema is provided.
 		#**********************************************************************
 		if (len(self.db_schema_file) <= 0 
 			or not os.path.isfile(self.db_schema_file)):
-			raise Exception("No database schema found.")
+			raise FileNotFoundException(self.db_schema_file)
 		#**********************************************************************
 		# Check if the file exist and we're allowed
 		# to overwrite, otherwise, raise exception.
 		#**********************************************************************
 		if (not _overwrite and self.db_file_exists()):
-			raise Exception(ERR_DB_FILE_EXIST)
+			raise DatabaseFileExistsException()
 		elif (_overwrite and self.db_file_exists()):
 			os.remove(self.db_file)
 
@@ -97,7 +130,7 @@ class VaultDatabase(object):
 		# Checks content was read from the file.
 		#**********************************************************************
 		if not(sql and len(sql) > 0):
-			raise Exception("Database schema file is empty.")
+			raise Exception(ERR_DB_SCHEMA_EMPTY)
 		
 		#**********************************************************************
 		# Open the sqlite database file and execute the SQL 
@@ -106,11 +139,26 @@ class VaultDatabase(object):
 		db_conn = sqlite3.connect(self.db_file)
 		db_conn.executescript(sql)
 		
-		self.logger.print_success("Loaded database '{:s}' successfully.".format(self.db_file))	
+		self.logger.print_success(INFO_DB_LOADED.format(self.db_file))	
 		
 	def set_db_file(self, _file):
+		""" Specifies which file contains the sqlite databse. 
+		
+		This functions sets the file in which the sqlite database
+		will be stored. 
+		
+		Args:
+			_file : Absolute path to the file containing the database.
+			
+		Returns:
+			None.
+			
+		Raises:
+			Exception if the provided argument is null or empty.
+		"""
+		
 		if not _file:
-			raise Exception(ERR_NULL_OR_EMPTY.format(u'file'))
+			raise NullOrEmptyArgumentException()
 			
 		self.db_file = _file
 		
@@ -120,80 +168,214 @@ class VaultDatabase(object):
 	def db_file_exists(self):
 		return os.path.isfile(self.db_file)
 		
-	def add_archive(self, _vx):
+	def add_malware(self, _vx):
+		#**********************************************************************
+		# Verfies Virus object is not null.
+		#**********************************************************************
 		if (_vx):
 			vx_archive = _vx.get_archive()
-			vx_password = _vx.get_password()
-			
-			self.logger.print_debug("Adding '{:s}' to database.".format(vx_archive))
-			new_id = self._new_archive_record(vx_archive, vx_password)
-			self.logger.print_debug("Archive '{:s}' successfully added with id '{:d}'.".format(vx_archive, new_id))
-			
-			vx_files = _vx.get_files()
-			for vx_file in vx_files:
+			vx_archive_name = os.path.basename(vx_archive)
+			vx_path = os.path.dirname(vx_archive)
+			#**********************************************************************
+			# Verify if an archive name has been generated
+			# for the virus object. Abort if not.
+			#**********************************************************************
+			if (vx_archive and len(vx_archive) > 0):
+				vx_password = _vx.get_password()
+				
 				#
-				# TODO:
-				# [ ] Support multiple file malware
-				vx_file_md5 = _vx.md5()
-				vx_file_sha1 = _vx.sha1()
-				new_id = self._new_file(vx_file, vx_file_md5, vx_file_sha1)
-				self.logger.print_debug("\tAdding file '{:s}' to database.".format(vx_file))
-			#
-			# TODO:
-			# Incomplete.
+				# Adds new "Archive" row to the database.
+				#
+				vx_sha1 = _vx.get_archive_sha1()
+				new_id = self._new_archive_record(vx_archive_name, vx_path, vx_sha1, vx_password)
+				self.logger.print_success(INFO_DB_ARCHIVE_ADDED.format(vx_archive, new_id))
+				
+				#
+				# For each file composing the malware, add a Files
+				# row to the database.
+				#
+				vx_files = _vx.get_files()
+				for vx_file in vx_files:
+					vx_file_name = vx_file.get_file()
+					vx_file_md5 = vx_file.get_md5()
+					vx_file_sha1 = vx_file.get_sha1()
+					vx_file_sha256 = vx_file.get_sha256()
+					new_id = self._new_file(new_id, vx_file_name, vx_file_md5, vx_file_sha1, vx_file_sha256)
+					self.logger.print_debug(INFO_DB_FILE_ADDED.format(vx_file))
+
+					#
+					# Save the idents found for each file.
+					#
+					vx_idents = vx_file.get_antiviral_results()
+					for (vx_av, vx_ident) in vx_idents.iteritems():
+						self._new_ident(new_id, vx_av, vx_ident)
+						self.logger.print_debug(INFO_DB_IDENT_ADDED.format(vx_av, vx_ident))
+
+			else:
+				raise NoArchiveException()
 		else:
-			raise Exception("Virus object cannot be null.")
+			raise NullOrEmptyArgumentException()
+			
+	def file_exists(self, _file):
+		""" Verifies if the specified file is already recorded into the
+		vault database.
+
+		This function will calculate the SHA1 hash of the given file and verify
+		if there is a matching entry in the Files table of the database.
 		
-	def _new_archive_record(self, _archive, _password):
+		Args:
+			_file: Absolute path of the file to verify.
+			
+		Returns:
+			True if the SHA1 hash of the given file is found in the Files table
+			of the database. False otherwise.
+			
+		Raises:
+			Exception if null or empty arguments. Raise exception if given
+			file is not found.
+		"""
+		if (_file and len(_file) > 0):
+			if (os.path.exists(_file)):
+				vx = VirusFile(_file)
+				vx_sha1 = vx.get_sha1()
+				sql = SQL_SELECT_FILE_BY_SHA.format(vx_sha1)
+				result = self._exec_sql_select(sql)
+				return len(result) > 0
+			else:
+				raise FileNotFoundException(_file)
+		else:
+			raise NullOrEmptyArgumentException()
+	
+	def _new_archive_record(self, _archive, _path, _hash, _password):
+		""" Creates a new archive record in the database.
+		
+		This function will create a SQL query to add a new row into
+		the Archives table within the vault database. 
+		
+		Args:
+			_archive: Filename of the archive
+			_password: Password needed to extract files from the
+			archive.
+		Returns:
+			The archive_id of the newly created row.
+			
+		Raises:
+			Exception if argument provided is null or empty. Raises
+			exception from sqlite module on error.
+		"""
 		if (not _archive and len(_archive) < 0):
-			raise Exception("Archive name cannot be null or empty.")
+			raise NullOrEmptyArgumentException()
 		
+		#**********************************************************************
+		# Formats the values needed to create a new archive
+		# record.
+		#**********************************************************************
 		archive_values = SQL_NEW_ARCHIVE_VALUES.format(
 			filename=_archive, 
+			path=_path,
+			hash=_hash,
 			password=_password)
+			
+		#**********************************************************************
+		# Creates the new INSERT sql statement.
+		#**********************************************************************
 		sql_new_archive = SQL_INSERT.format(
 			table="Archives", 
-			columns="filename, password", 
+			columns="filename, path, hash, password", 
 			values=archive_values)
+		
+		#**********************************************************************
+		# Returns the auto generated ID of the newly inserted
+		# record.
+		#**********************************************************************
 		new_id = self._execute_sql(sql_new_archive)
 		return new_id
 		
-	def _new_file(self, archive_id, _filename, _md5, _sha1):
+	def _new_file(self, _archive_id, _filename, _md5, _sha1, _sha256):
+		""" Inserts a new file record into the vault database.
+		
+		This function adds a new file record into the vault database.
+		
+		Args:
+			_archive_id: The Archive ID which the file is included in.
+			_filename: The name of the file.
+			_md5: The MD5 hash, in hex format, of the file.
+			_sha1: The SHA1 hash, in hex format, of the file.
+			
+		Returns:
+			The new auto-generated ID of the new record.
+			
+		Raises:
+			Exception from database connector.
+		"""
 		file_values = SQL_NEW_FILE_VALUES.format(
 			filename=_filename,
 			md5=_md5,
-			sha1=_sha1
+			sha1=_sha1,
+			sha256 = _sha256,
+			archive=_archive_id
 		)
-		sql_new_file = SQL.INSERT.format(
-			table="Files",
-			columns="filename, md5, sha1",
+		
+		#**********************************************************************
+		# Creates the new INSERT sql statement.
+		#**********************************************************************
+		sql_new_file = SQL_INSERT.format(
+			table=TBL_FILES,
+			columns=COL_FILES,
 			values=file_values
 		)
+		
+		#**********************************************************************
+		# Returns the auto generated ID of the newly inserted
+		# record.
+		#**********************************************************************
 		new_id = self._execute_sql(sql_new_file)
 		return new_id
 		
+	def _new_ident(self, _file_id, _av, _ident):
+		SQL_NEW_IDENT = "{fileid:d},{avid:d},'{ident:s}'"
+		av_id = self.get_av_id(_av)
+		if (av_id and av_id > 0):
+			ident_values = SQL_NEW_IDENT.format(fileid=_file_id, avid=av_id, 
+				ident=_ident)
+			sql_new_ident = SQL_INSERT.format(
+				table="Idents",
+				columns="file_id, av_id, name",
+				values=ident_values
+			)
+			self._execute_sql(sql_new_ident)
+		else:
+			raise Exception("Failed to find AV id for '{:s}'.".format(_av))
+		
+	def get_av_id(self, _av):
+		av_id = -1
+		SQL_SELECT_AVID = "SELECT av_id FROM AVs WHERE name = '{:s}'"
+		sql = SQL_SELECT_AVID.format(_av)
+		db_conn = sqlite3.connect(self.db_file)
+		db_cursor = db_conn.cursor()
+		db_cursor.execute(sql)
+		row = db_cursor.fetchone()
+		if (row):
+			av_id = row[0]
+		return av_id
+
 	def _execute_sql(self, _sql):
 		last_id = -1
 		if (len(_sql) > 0):
 			db_conn = sqlite3.connect(self.db_file)
 			db_cursor = db_conn.cursor()
-			self.logger.print_debug(_sql)
+			#self.logger.print_debug(_sql)
 			db_cursor.execute(_sql)
 			last_id = db_cursor.lastrowid
+			db_conn.commit()
 		return last_id
-		
-	def read_vx_by_md5(self, _md5):
-		print("not implemented")
-	
-	def read_vx_by_file(self, _md5):
-			print("not implemented")
-	
-	def update_vx(self, _vx):
-		print("not implemented")
-		
-	def delete_vx(self, _vx):
-		print("not implemented")
-		
-	def vx_exists(self, _vx):
-		print("not implemented")
-		
+
+	def _exec_sql_select(self, _sql):
+		if (len(_sql) > 0):
+			db_conn = sqlite3.connect(self.db_file)
+			db_cursor = db_conn.cursor()
+			#self.logger.print_debug(_sql)
+			db_cursor.execute(_sql)
+			return db_cursor.fetchall()
+		else:
+			return []

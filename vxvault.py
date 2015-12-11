@@ -49,29 +49,20 @@ __version__ = '.'.join(__version_info__)
 import os
 import sys
 import time
-import signal
 import argparse
-
+import traceback
+#
 from Engine import Engine
 from Logger import Logger
+#
+from VaultExceptions import *
+#
 #//////////////////////////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////////////////////////
 # Global variables and constants
 YES	=	"Y"
 NO	=	"n"
-
-ERR_NO_VAULT_FOUND		=	"No vault detected at '{:s}'."
-ERR_VAULT_CREATION		=	"Error creating vault: {:s}."
-ERR_FAILED_CONNECT		=	"Failed to connect to the Internet."
-ERR_FAILED_HUNTERS_START=	"Failed to start the hunters: {:s}."
-ERR_FAILED_ANALYZE_START=	"Failed to start the analyzers: {:s}."
-
-INFO_VAULT_CREATED		=	"Vault successfully created."
-INFO_HUNTERS_STARTED	=	"Succesfully started hunters threads."
-INFO_ANALYZE_STARTED	=	"Succesfully started analyzers threads."
-INFO_CTRLC_INT			=	"Control-C interrupt detected. Terminating..."
-INFO_CONNECTED_NET		=	"Connected to the Internet."
 
 ASK_CREATE_VAULT		=	"Would you like to create one? [Y/n]"
 
@@ -98,6 +89,23 @@ vault_options.add_argument("-vt", "--vtapi",
 	dest="vtapikey", 
 	required=True,
 	help="Provides the public key to use the API of VirusTotal.")	
+vault_options.add_argument("-a", "--add", 
+	dest="newfile",
+	help="Specifies a file or directory containing files to a single malware to add to the vault.")
+vault_options.add_argument("-i", "--import", 
+	dest="import_dir",
+	help="Specifies a directory containing files to multiple malware to import into the vault.")
+vault_options.add_argument("-p", "--password", 
+	dest="password",
+	default="",
+	help="Specifies the password to used for encrypting archives containing the malware.")
+vault_options.add_argument("--hunt", 
+	dest="hunt_mode",
+	action="store_true",
+	help="Starts the vault in hunt mode.")
+vault_options.add_argument("--test", 
+	dest="test",
+	action="store_true")
 vault_options.add_argument("--verbose", 
 	dest="verbose", 
 	action="store_true",
@@ -114,27 +122,26 @@ def banner():
     License v3 for more information. 
     """)
 
-engine = None	
-	
-def signal_handler(signal, frame):
-		print('You pressed Ctrl+C!')
-		engine.shutdown()
-		sys.exit(0)	
-	
 def main(args):
 	#**************************************************************************
 	# Initialization of the vault mechanisms
 	# and objects.
 	#**************************************************************************
-	vt_api = args.vtapikey
-	vault_base = args.base
+	vt_api = args.vtapikey.strip()
+	vault_base = args.base.strip()
+	debug = args.verbose
+	password = args.password
+	
 	main_logger = Logger(
 		_output	=	sys.stdout,
-		_debug	=	args.verbose)
+		_debug	=	debug)
+		
 	engine = Engine(
 		_base	=	vault_base,
 		_vtapi	=	vt_api, 
+		_password = password,
 		_logger	=	main_logger)
+		
 	#**************************************************************************
 	# Verify if the vault already exists at the
 	# given base.
@@ -152,6 +159,8 @@ def main(args):
 			except Exception as e:
 				main_logger.print_error(ERR_VAULT_CREATION.format(e.message))
 				sys.exit(1)
+		else:
+			sys.exit(1)
 
 	#**************************************************************************
 	# Check if we have a connection to the Internet
@@ -161,42 +170,53 @@ def main(args):
 		main_logger.print_error(ERR_FAILED_CONNECT)
 		sys.exit(1)
 	main_logger.print_success(INFO_CONNECTED_NET)
-	#**************************************************************************
-	# Start gathering malware from the Internet
-	# by starting the various hunters.
-	#**************************************************************************
+
 	try:
-		engine.start_hunters()
-		main_logger.print_success(INFO_HUNTERS_STARTED)
+	#**************************************************************************
+	# Functions
+	#**************************************************************************
+	#
+	# Add new item to vault:
+	#
+	#**************************************************************************
+		if (args.newfile):
+			newfile = args.newfile.strip()
+			if (os.path.isfile(newfile)):
+				engine.add_single_file_virus(newfile)
+			elif (os.path.isdir(newfile)):
+				engine.add_single_dir_virus(newfile)
+			elif (newfile[0:4].lower() == "http"):
+				engine.add_http_file_virus(newfile)
+			else:
+				raise FileNotFoundException(newfile)
+	#**************************************************************************
+	# Import all malware from the given directory:
+	#**************************************************************************
+		elif (args.import_dir):		
+			source_dir = args.import_dir
+			#
+			# If the user specified a file rather than a directory,
+			# add the file.
+			#
+			if (os.path.isfile(source_dir)):
+				engine.add_single_file_virus(source_dir)	
+			elif (os.path.isdir(source_dir)):
+				engine.add_multiple_virii_from_dir(source_dir)
+			else:
+				raise FileNotFoundException(source_dir)
+		elif (args.hunt_mode):
+			engine.start_malware_hunt()
+	#
+	#**************************************************************************
+	#
 	except Exception as e:
-		main_logger.print_error(ERR_FAILED_HUNTERS_START.format(e.message))
-		engine.shutdown()
-		sys.exit(1)
-	#**************************************************************************
-	# Start the analyzer objects to classify
-	# and sort malware into the vault.
-	#**************************************************************************
-	try:
-		engine.start_analyzers()
-		main_logger.print_success(INFO_ANALYZE_STARTED)
-	except Exception as e:
-		main_logger.print_error(ERR_FAILED_ANALYZE_START.format(e.message))
-		engine.shutdown()
-		sys.exit(1)	
-	#**************************************************************************
-	# Let the engine run until the user presses
-	# Control-C to stop.
-	#**************************************************************************
-	signal.signal(signal.SIGINT, signal_handler)
-	# For debugging:
-	count = 50
-	try:
-		while (count > 0):
-			time.sleep(1)
-			count -= 1
-	except KeyboardInterrupt:
-		main_logger.print_info(INFO_CTRLC_INT)
+		main_logger.print_error(e.message)
+		traceback.print_exc()
 		
+	#**************************************************************************
+	# Clean up
+	#**************************************************************************
+	main_logger.print_warning(INFO_PROGRAM_TERMINATE)
 	engine.shutdown()
 			
 			
