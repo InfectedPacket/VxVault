@@ -96,7 +96,7 @@ class SevenZipArchiver(Archiver):
 	def get_extension(self):
 		return SevenZipArchiver.ArchiveExtension
 		
-	def archive(self, _vx, _dstpath):
+	def archive(self, _vx, _dstpath, _multipleSamplesAllowed=False):
 		""" Creates a 7zip archive file containing all files contained in the
 		provided Virus object at the given destination path.
 		
@@ -119,7 +119,18 @@ class SevenZipArchiver(Archiver):
 		if (_vx and _dstpath and len(_dstpath) > 0):
 		
 			vx_arch_files = [ f.get_absolute() for f in _vx.get_files()]
-			vx_arch_file = os.path.join(_dstpath, _vx.generate_archive_name(self.get_extension()))
+			vx_arch_filename = _vx.generate_archive_name(self.get_extension())
+			
+			#
+			# Verifies if an archive with a similar name exists and if
+			# we should keep a copy anyway.
+			#
+			if (os.path.exists(vx_arch_file) and not _multipleSamplesAllowed):
+				raise FileExistsException(vx_arch_file)
+			elif (os.path.exists(vx_arch_file)):
+				vx_arch_filename = "{:s}.{:s}".format(vx_arch_filename, _vx.get_archive_sha1())
+			
+			vx_arch_file = os.path.join(_dstpath, vx_arch_filename)
 			
 			#**********************************************************************
 			# Verifies if the Virus objects contains file to be

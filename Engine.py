@@ -82,6 +82,7 @@ class Engine(object):
 	def __init__(self, _base, _vtapi, 
 		_password=Vault.DefaultArchivePassword, 
 		_saveFileNoDetection=False,
+		_allowMultipleSamples=False,
 		_logger=None):
 		"""Initializes the engine, including the logger, vault and
 		other class variables.
@@ -129,7 +130,8 @@ class Engine(object):
 		# Initializes a new vault object with the
 		# given base directory.
 		#**************************************************************************
-		self.vxvault = Vault(_base, _logger=self.logger)
+		self.vxvault = Vault(_base, _logger=self.logger, 
+			_multipleSamplesAllowed = _allowMultipleSamples)
 		
 		self.saveUndetectedFiles = _saveFileNoDetection
 		self.active_hunters = []
