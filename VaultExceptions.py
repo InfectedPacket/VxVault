@@ -81,7 +81,7 @@ WARN_NO_NEW_ENTRIES		=	u"No new entries found on malcode."
 
 class VaultException(Exception):
 
-	def __init__(self, _message, _errors):
+	def __init__(self, _message, _errors=None):
 		super(Exception, self).__init__(_message)
 		self.errors = _errors
 		

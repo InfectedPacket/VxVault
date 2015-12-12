@@ -49,6 +49,7 @@ __version__ = '.'.join(__version_info__)
 import os
 import sys
 import time
+import signal
 import argparse
 import traceback
 #
@@ -119,6 +120,11 @@ def banner():
     License v3 for more information. 
     """)
 
+def KeyboardInterruptHandler(_signal, _frame):
+	print("Ctrl-C detected")
+	engine.shutdown()
+	sys.exit(0)
+	
 def main(args):
 	#**************************************************************************
 	# Initialization of the vault mechanisms
@@ -129,11 +135,14 @@ def main(args):
 	debug = args.verbose
 	password = args.password
 	
+	signal.signal(signal.SIGINT, KeyboardInterruptHandler)
+	
 	main_logger = Logger(
 		_output	=	sys.stdout,
 		_debug	=	debug)
 		
-	engine = Engine(
+	global engine
+	engine	= Engine(
 		_base	=	vault_base,
 		_vtapi	=	vt_api, 
 		_password = password,

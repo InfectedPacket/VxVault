@@ -60,6 +60,7 @@ INFO_HUNT_THREADS_START		=	"Starting the hunters..."
 INFO_HUNT_MALCODE_STARTED	=	"Started Malc0de hunter."
 INFO_HUNT_LOCAL_STARTED		=	"Started local url hunter. Watching for files in '{:s}'."
 MSG_INFO_DOWNLOADING	=	u"Downloading {:s} from {:s}."
+WARN_ENGINE_SHUTDOWN	=	"Engine is shutting down..."
 DS_VIRUS_TOTAL = "VirusTotal"
 UNALLOWED_CHARS_FILES	=	"/?<>\:*|\"^"
 DEFAULT_REPLACE_CHAR	=	"_"
@@ -606,7 +607,17 @@ class Engine(object):
 			
 	def start_malware_hunt(self):
 		"""
+		Starts the hunting threads.
 		
+		Args:
+			None.
+			
+		Returns:
+			None.
+			
+		Raises:
+			Multiple exceptions if downloading, archiving or recording
+			fails.
 		"""
 		
 		hunt_malcode = MalcodeHunter(
@@ -620,7 +631,16 @@ class Engine(object):
 	
 	def stop_malware_hunt(self):
 		"""
+		Stops the hunting threads.
 		
+		Args:
+			None.
+			
+		Returns:
+			None.
+			
+		Raises:
+			None.
 		"""
 		for hunter in self.active_hunters:
 			hunter.stop_hunting()
@@ -658,5 +678,6 @@ class Engine(object):
 		Raises:
 			None.
 		"""
-		pass
+		self.logger.print_warning(WARN_ENGINE_SHUTDOWN)
+		self.stop_malware_hunt()
 		
