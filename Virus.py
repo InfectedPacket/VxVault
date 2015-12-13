@@ -414,6 +414,26 @@ class Virus(object):
 		return False
 		
 	def generate_archive_name(self, _extension):
+		"""
+		Generates a name for the archive based on the scan information
+		stored in the object.
+		
+		This function will attempt to generate a name to archive the
+		files of the malware. It will use the scan information stored
+		within the object. to generate the name. If no scan information
+		is available, this function will return the name of the original
+		file with the MD5 digest in hex format appended to it, i.e.
+		"file.<md5>.<extension>".
+		
+		Args:
+			_extension: Extension to add to the name of the archive.
+			
+		Returns:
+			String with the generated archive name.
+			
+		Raises:
+			Exception on archive name generation.
+		"""
 		chars = "\\`*:{}[]()>#+-!$&=\"\'"
 		vx_name = self._create_archive_filename()
 		# 

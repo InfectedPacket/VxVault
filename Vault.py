@@ -65,7 +65,7 @@ class Vault(object):
 	#	[X] User-provided from command line.
 	DefaultArchivePassword = DEFAULT_ARCHIVE_PASSWORD
 
-	def __init__(self, _base, _password="", _allowMultipleSamples = False, _logger=None):
+	def __init__(self, _base, _password="", _multipleSamplesAllowed = False, _logger=None):
 		"""Initializes the Vault and the FileSystem objects.
 
 		Creates a new Vault object which is used to interface
@@ -109,7 +109,7 @@ class Vault(object):
 			_logger = self.logger
 		)
 		self.set_archiver(archive_program)
-		self.allowMultipleSamples = _allowMultipleSamples
+		self.multipleSamplesAllowed = _multipleSamplesAllowed
 		
 	def __repr__(self):
 		return "<Vault '{:s}' @{:s}>".format(

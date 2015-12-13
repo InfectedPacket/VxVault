@@ -55,12 +55,12 @@ from Hunters import *
 #//////////////////////////////////////////////////////////////////////////////
 # Constants
 ERR_MAX_ANALYZER_THREADS	=	"Maximum number of concurrent Analyzer objects reached."
-INFO_CONNECTED_INTERNET		=	"Successfully connected to the Internet."
-INFO_HUNT_THREADS_START		=	"Starting the hunters..."
-INFO_HUNT_MALCODE_STARTED	=	"Started Malc0de hunter."
-INFO_HUNT_LOCAL_STARTED		=	"Started local url hunter. Watching for files in '{:s}'."
-MSG_INFO_DOWNLOADING	=	u"Downloading {:s} from {:s}."
+
+MSG_INFO_DOWNLOADING		=	u"Downloading {:s} from {:s}."
+
+WARN_IGNORE_FILE			=	"Ignoring undetected file: {:s}."
 WARN_ENGINE_SHUTDOWN	=	"Engine is shutting down..."
+
 DS_VIRUS_TOTAL = "VirusTotal"
 UNALLOWED_CHARS_FILES	=	"/?<>\:*|\"^"
 DEFAULT_REPLACE_CHAR	=	"_"
@@ -291,7 +291,7 @@ class Engine(object):
 			into the vault.
 			
 			TODO:
-			[ ] Test this function.
+			[X] Test this function.
 			
 			Args:
 				_url: The URL of the file to download. Must start with HTTP.
@@ -330,6 +330,26 @@ class Engine(object):
 					raise FileDownloadException()
 			else:
 				raise InvalidUrlException(url)
+		else:
+			raise NullOrEmptyArgumentException()
+		
+	def add_files_from_urls(self, _files):
+		"""
+		
+		"""
+		if (_files and len(_files) > 0):
+			hunter = LocalHunter(
+				_engine = self, 
+				_files = _files, 
+				_extensions = Hunter.HuntedExtensions,
+				_logger = self.logger)
+			urls = hunter.get_urls_from_files(_files)
+
+			if (len(urls) > 0):
+				for url in urls:
+					self.add_http_file_virus(url)
+			else:
+				raise NoUrlFoundException()
 		else:
 			raise NullOrEmptyArgumentException()
 		
@@ -451,6 +471,8 @@ class Engine(object):
 						# Archives the file into the fault.
 						#******************************************************
 						self.vxvault.archive_file(vx)
+					else:
+						self.logger.print_warning(WARN_IGNORE_FILE.format(vx.get_file()))
 			else:
 				raise FileNotFoundException(_file)
 		else:
@@ -611,6 +633,18 @@ class Engine(object):
 		"""
 		Starts the hunting threads.
 		
+		This function will create threads for each type of hunter available and
+		start it. Each thread will then start downloading and analyzing files
+		found on their individual sources.
+		
+		Malc0de:
+			The malc0de hunter looks for new malware links on the malc0de website.
+			
+		Local:
+			The local hunter will look for files in the ./pit/urls directory
+			located in the vault. It will look within each file for URLs
+			to files with extensions listed in Hunter.HuntedExtensions.
+		
 		Args:
 			None.
 			
@@ -625,8 +659,14 @@ class Engine(object):
 		hunt_malcode = MalcodeHunter(
 			_engine=self,
 			_logger=self.logger)
-		
+		hunt_local = LocalHunter(
+			_engine = self, 
+			_files = [self.vxvault], 
+			_extensions = Hunter.HuntedExtensions,
+			_logger = self.logger)
+			
 		self.active_hunters.append(hunt_malcode)
+		self.active_hunters.append(hunt_local)
 		
 		for hunter in self.active_hunters:
 			hunter.start()

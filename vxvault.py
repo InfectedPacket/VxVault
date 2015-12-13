@@ -100,6 +100,9 @@ vault_options.add_argument("-p", "--password",
 	dest="password",
 	default="",
 	help="Specifies the password to used for encrypting archives containing the malware.")
+vault_options.add_argument("-x", "--extract-urls", 
+	dest="urlsfile",
+	help="Specifies a file or directory with files containg URLs to download and archive.")
 vault_options.add_argument("--hunt", 
 	dest="hunt_mode",
 	action="store_true",
@@ -210,6 +213,12 @@ def main(args):
 				engine.add_multiple_virii_from_dir(source_dir)
 			else:
 				raise FileNotFoundException(source_dir)
+	#**************************************************************************
+	# Import malware from URLs contained in files
+	#**************************************************************************
+		elif (args.urlsfile):
+			source_urls = [args.urlsfile]
+			engine.add_files_from_urls(source_urls)
 		elif (args.hunt_mode):
 			engine.start_malware_hunt()
 	#

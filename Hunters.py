@@ -318,33 +318,79 @@ class LocalHunter(Hunter):
 
 	DefaultUrlRE = r'(h(tt|xx)ps?://[^\s]+)'
 
-	def __init__(self, _engine, _extensions = [], _logger=None):
-		super(LocalHunter, self).__init__(_pit, _extensions, _logger)
-		self.dir = _dir
+	def __init__(self, _engine, _files=[], _extensions = [], _logger=None):
+		super(LocalHunter, self).__init__(_engine, _extensions, _logger)
+		self.files = _files
+		if (len(_extensions) > 0):
+			ext_re = "|".join(_extensions)
+			LocalHunter.DefaultUrlRE = r'(h(tt|xx)ps?://[^\s]+\.(' + ext_re + '))'
 		
+	def _get_urls_from_dir(self, _dir):
+		if (_dir and len(_dir) > 0):
+			if (os.path.exists(_dir)):
+				urls = []
+				
+				for root, dirs, files in os.walk(_dir):
+					for name in files:
+						source_file = os.path.join(root, name)
+						file_urls = self._get_urls_from_file(source_file)
+						urls.append(file_urls)
+				
+				return urls
+			else:
+				raise FileNotFoundException(_dir)
+		else:
+			raise NullOrEmptyArgumentException()
+	
+	def _get_urls_from_files(self, _files):
+		
+		if (_files):
+			urls = []
+			
+			for file in _files:
+				if (len(file) > 0 and os.path.exists(file)):
+					self.logger.print_debug("Extracting URLs from {:s}.".format(file))
+					file_urls = []
+					if (os.path.isdir(file)):
+						file_urls = self._get_urls_from_dir(file)
+					elif(os.path.isfile(file)):
+						file_urls = self._get_urls_from_file(file)
+					urls = urls + file_urls
+				else:
+					self.logger.print_error(ERR_FILE_NOT_FOUND.format(file))
+			return urls
+		else:
+			raise NullOrEmptyArgumentException()	
+	
+	def _get_urls_from_file(self, _file):
+		if (_file and len(_file) > 0):
+			if (os.path.exists(_file)):
+				with open(_file, "r") as f:
+					contents = f.read().lower().strip()
+				
+				urls = []
+				if (len(contents) > 0):
+					found_urls = re.findall(LocalHunter.DefaultUrlRE, contents)
+					for found_url in found_urls:
+						vx_url = found_url[0]
+						vx_file = vx_url.split("/")[-1]						
+						vx_ext = vx_file.split('.')[-1]
+						#if (not "virustotal" in found_url and vx_ext in self.extensions):
+						self.logger.print_debug("\t>> {:s}".format(vx_url))
+						urls.append(vx_url.replace("hxxp", "http"))
+				return urls
+			else:
+				raise FileNotFoundException(_file)
+		else:
+			raise NullOrEmptyArgumentException()
+				
+	def get_urls_from_files(self, _files):
+		urls = self._get_urls_from_files(_files)
+		print(urls)
+		return urls
+		
+				
 	def get_new_urls_since(self, _date, _max=150):
 		urls = []
-		self.logger.print_info(MSG_INFO_CONNECTING.format(self.dir))
-		
-		#
-		# Retrieves absolute path of all files in the dump
-		# directory.
-		#
-		local_files = [ os.path.join(self.dir, f) for f in os.listdir(self.dir) if not os.path.isfile(f) ]
-		
-		for file in local_files:
-			self.logger.print_debug("Processing '{:s}'...".format(file))
-			with open(file, "r") as f:
-				contents = f.read().lower()
-			if (len(contents) > 0):
-				found_urls = re.findall(LocalHunter.DefaultUrlRE, contents)
-				for found_url in found_urls:
-					vx_url = found_url[0]
-					vx_file = vx_url.split("/")[-1]						
-					vx_ext = vx_file.split('.')[-1]
-					if (not "virustotal" in found_url and vx_ext in self.extensions):
-						self.logger.print_debug("\t>> {:s}...".format(url))
-						urls.append(url.replace("hxxp", "http"))
-			else:
-				self.logger.print_error(ERR_FILE_NO_CONTENTS.format(file))
+		urls = self._get_urls_from_files(self.files)
 		return urls

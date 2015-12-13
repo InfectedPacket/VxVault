@@ -58,6 +58,7 @@ ERR_DB_NO_DB_FILE		=	"No file specified for database."
 ERR_CREATE_ARCHIVE		=	"Error while creating the archive: {:s}."
 ERR_VIRUS_NO_FILE		=	"Virus object contains no file."
 ERR_NO_URL_POST			=	u"Could not find URL in post: \n{:s}"
+ERR_NO_URL_FOUND		=	u"No URL found in provided file(s)."
 #
 # Information messages
 #
@@ -74,6 +75,10 @@ INFO_DB_IDENT_ADDED 	= 	"\t\tAdded identification by '{:s}' as '{:s}'."
 INFO_ARCHIVE_CREATED 	= 	"Created archive '{:s}'."
 INFO_HUNT_COMPLETE 		= 	"Hunt completed. Thread '{:s}' is terminated."
 INFO_NBENTRIES_FOUND 	= 	u"New entries found: {:d}."
+INFO_CONNECTED_INTERNET		=	"Successfully connected to the Internet."
+INFO_HUNT_THREADS_START		=	"Starting the hunters..."
+INFO_HUNT_MALCODE_STARTED	=	"Started Malc0de hunter."
+INFO_HUNT_LOCAL_STARTED		=	"Started local url hunter. Watching for files in '{:s}'."
 #
 WARN_NO_NEW_ENTRIES		=	u"No new entries found on malcode."
 #
@@ -135,7 +140,12 @@ class NoArchiveException(VaultException):
 
 	def __init__(self, _info=""):
 		super(NoArchiveException, self).__init__(ERR_NO_ARCHIVE.format(_info))
-		
+	
+class NoUrlFoundException(VaultException):
+
+	def __init__(self, _info=""):
+		super(NoUrlFoundException, self).__init__(ERR_NO_URL_FOUND.format(_info))
+	
 class ArchiveExistsException(VaultException):
 
 	def __init__(self, _info=""):
