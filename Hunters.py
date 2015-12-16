@@ -39,6 +39,7 @@ import sys
 import time
 import urllib
 import urllib2
+import traceback
 import threading
 import feedparser
 from Logger import Logger
@@ -73,6 +74,8 @@ MSG_INFO_NB_ENTRIES		=	"{:d} new entries found."
 MSG_INFO_NEXT_RUN		=	"Next run: {:%H:%M:%S}"
 
 MSG_WARN_NB_ENTRIES		=	"Considering only {:d} entries."
+
+DEFAULT_MAX_ENTRIES		=	150
 #//////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
@@ -164,295 +167,266 @@ class Hunter(threading.Thread):
 					# Use the engine to add the newly found URL to the
 					# vault.
 					#**********************************************************
-					self.engine.add_http_file_virus(vx_url)
+					if (vx_url and len(vx_url) > 0):
+						self.engine.add_http_file_virus(vx_url)
 				except Exception as e:
 					self.logger.print_error(e.message)
+					#traceback.print_exc()
 			
-				#**************************************************************
-				# To prevent flooding the data source with requests,
-				# we wait for a few seconds.
-				#**************************************************************
-				self.next_hunt = datetime.now() + timedelta(seconds=Hunter.DefaultHuntInterval)
-				self.logger.print_info(MSG_INFO_NEXT_RUN.format(self.next_hunt))
+			#**************************************************************
+			# To prevent flooding the data source with requests,
+			# we wait for a few seconds.
+			#**************************************************************
+			self.next_hunt = datetime.now() + timedelta(seconds=Hunter.DefaultHuntInterval)
+			self.logger.print_info(MSG_INFO_NEXT_RUN.format(self.next_hunt))
 			
 			while (datetime.now() < self.next_hunt and self.is_hunting):
 				if self.is_hunting == True:
 					time.sleep(Hunter.DefaultHuntWait)
 			
-		self.logger.print_warning(INFO_HUNT_COMPLETE.format(self.name))
-		
-class MalcodeHunter(Hunter):
+		self.logger.print_warning(INFO_HUNT_COMPLETE.format(self.thread_name))
 
-	DefaultThreadName = u"vx-hunter-malcode"
-	MalcodeRssSummarySeparator = u":"
-	MalcodeRssContentsSeparator = u","	
+class RssHunter(Hunter):
+	__metaclass__ = abc.ABCMeta
 	
-	URL = 'http://malc0de.com/rss/'
-	URL_MARKER = "URL:"
+	DefaultThreadName = u"vx-hunter-rss"
 	
-	def __init__(self, _engine, _extensions = Hunter.HuntedExtensions, _logger=None):
-		super(MalcodeHunter, self).__init__(_engine, _extensions, _logger)	
-		self.name=MalcodeHunter.DefaultThreadName
-		self.last_entry = u""
-	
-	def get_new_urls_since(self, _date, _max=150):
-		"""
+	def __init__(self, _engine, 
+		_extensions = Hunter.HuntedExtensions,
+		_logger=None):
 		
-		Note: Malc0de does not include dates within their posts on their RSS feed,
-		so this method returns the maximum number of entries when used for the first
-		time, or all entries between the current run and the last one.
+		super(RssHunter, self).__init__(_engine, _extensions, _logger)
+		self.rss_feed = None
+		self.last_entry = None
 		
-		Args:
-			_date: Last time the source was checked for new malware.
-			_max: Maximum number of entries to consider.
-			
-		Returns:
-			Array of strings representing URLs to malware files.
-			
-		Raises:
-			None.
-		"""
+	@abc.abstractmethod
+	def _get_url_from_entry(self, _title, _summary, _link):
+		return
+		
+	def get_new_urls_since(self, _date, _max=DEFAULT_MAX_ENTRIES):
+		#**********************************************************************
+		# Contains the URLs found in the RSS feed.
+		#**********************************************************************
 		urls = []
 		
 		#**********************************************************************
-		# Retrieve the RSS feed from Malcode:
+		# Retrieve the RSS feed
 		#**********************************************************************
-		self.logger.print_debug(MSG_INFO_CONNECTING.format(MalcodeHunter.URL))
-		malcode_rss = feedparser.parse(MalcodeHunter.URL)
-
+		self.logger.print_debug(MSG_INFO_CONNECTING.format(self.rss_feed))
+		rss_feed = feedparser.parse(self.rss_feed)
+		
 		#**********************************************************************
 		# Start processing entries if any where found.
 		#**********************************************************************
-		if (len(malcode_rss.entries) > 0):
-			#
-			# Verifies if some of the entries are new. I.e. check all the 
-			# entries between the first one retrieve and the last entry processed
-			# and stored in self.last_entry
-			# TODO:
-			#	[ ] Value of self.last_entry should be retrieved from the database.
+		found_entries = len(rss_feed.entries)
+		self.logger.print_debug("[{:s}]: {:d} entries retrieved.".format(self.thread_name, found_entries))
+		if (found_entries > 0):
+		
+			max = found_entries
+			if (max > _max):
+				max = _max
+		
 			nb_entries = 0
-			while (self.last_entry != malcode_rss.entries[nb_entries] and nb_entries < _max):
+			while (nb_entries < max and self.last_entry != rss_feed.entries[nb_entries]):
 				nb_entries += 1
-					
-			#
+				
+			#******************************************************************
 			# If new entries are found, start recoding them
 			# if there's not already a sample in the vault (based on a hash)
-			#
+			#******************************************************************
 			if (nb_entries > 0):
 				self.logger.print_info(INFO_NBENTRIES_FOUND.format(nb_entries))
-				self.last_entry = malcode_rss.entries[0]
+				self.last_entry = rss_feed.entries[0]
 				
 				for i in range(0, nb_entries):
-					#
-					# Information about the malware is stored in the summary
-					# of the RSS post.
-					#
-					desc = malcode_rss.entries[i].summary.strip()
+					entry_title = rss_feed.entries[i].title
+					entry_contents = rss_feed.entries[i].summary
+					entry_link = rss_feed.entries[i].link
 					
-					desc_items = desc.split(MalcodeHunter.MalcodeRssContentsSeparator)
-					url_data = desc_items[0]
-
-					#**********************************************************
-					# There should be 5 items in the summary of the post, if
-					# not, then something is wrong, ignore it.
-					#**********************************************************
-					if (len(desc_items) == 5):
-						if (MalcodeHunter.URL_MARKER in url_data):
-							if (MalcodeHunter.MalcodeRssSummarySeparator in url_data):
-								url_data = url_data.split(MalcodeHunter.MalcodeRssSummarySeparator)[1]
-							url_data = url_data.strip()
-							
-							if (len(url_data) > 0):
-								#**********************************************
-								# Prepends "HTTP" at the beginning of the found 
-								# URL, as it is usually not included.
-								#**********************************************
-								vx_url = url_data
-								if (url_data[0:4].lower() != "http"):
-									vx_url = HTTP_URL_FORMAT.format(url_data)
-											
-								#**********************************************
-								# Retrieve the filename within the URL, so 
-								# we can check if it's a file with an interesting
-								# extension.
-								#**********************************************
-								vx_file = vx_url.split("/")[-1]	
-								#**********************************************
-								# If the file contains "?", we likely have a query
-								# within the name, we need to weed it out.
-								#**********************************************
-								if (u"?" in vx_file):
-									tmp_file = vx_file.split(u"?")
-									#
-									# TODO:
-									# [ ] Check if the file is in the first
-									# or second item of the split, ie.
-									# file.exe?dl=1 or
-									# download.php?file=bad.exe
-									# Use a RE for this.
-									vx_file = tmp_file[0]
-							
-								#**********************************************
-								# Finally, get the extension and confirm we will
-								# keep the URL.
-								#**********************************************
-								vx_ext = vx_file.split('.')[-1]
-								#**********************************************
-								# If the extension is greater than 5 chars, it's
-								# probably a bad URL.
-								#**********************************************
-								if (len(vx_ext) > 5):
-									vx_ext = ""
-
-								if (vx_ext in self.extensions):
-									urls.append(vx_url)
-						else:
-							self.logger.print_warning(ERR_NO_URL_POST.format(desc))
-					else:
-						self.logger.print_warning(ERR_FAILED_PARSE_MALCODE.format(desc))
-			else:
-				self.logger.print_warning(WARN_NO_NEW_ENTRIES)
-		return urls	
+					url = self._get_url_from_entry(
+						entry_title, 
+						entry_contents,
+						entry_link)
+					if (url != None):
+						urls.append(url)
+					
+		return urls
 		
-class MdlHunter(Hunter):
+class MalcodeHunter(RssHunter):
+
+	DefaultThreadName = u"vx-hunter-malcode"
+	RssSummarySeparator = u":"
+	RssContentsSeparator = u","	
+	
+	URL = 'http://malc0de.com/rss/'
+	UrlMarker = "URL:"
+	
+	def __init__(self, _engine, _extensions = Hunter.HuntedExtensions, _logger=None):
+		super(MalcodeHunter, self).__init__(_engine, _extensions, _logger)	
+		self.thread_name=MalcodeHunter.DefaultThreadName		
+		self.rss_feed = MalcodeHunter.URL
+		self.last_entry = u""
+	
+	def _get_url_from_entry(self, _title, _summary, _link):
+		if (_summary and len(_summary) > 0):
+			tokens = _summary.split(MalcodeHunter.RssContentsSeparator)
+			url_data = tokens[0]
+
+				#**********************************************************
+				# There should be 5 items in the summary of the post, if
+				# not, then something is wrong, ignore it.
+				#**********************************************************
+			if (len(tokens) == 5):
+				if (MalcodeHunter.UrlMarker in url_data):
+					if (MalcodeHunter.RssSummarySeparator in url_data):
+						url_data = url_data.split(MalcodeHunter.RssSummarySeparator)[1]
+					url_data = url_data.strip()
+					
+					if (len(url_data) > 0):
+						#**********************************************
+						# Prepends "HTTP" at the beginning of the found 
+						# URL, as it is usually not included.
+						#**********************************************
+						vx_url = url_data
+						if (url_data[0:4].lower() != "http"):
+							vx_url = HTTP_URL_FORMAT.format(url_data)
+									
+						#**********************************************
+						# Retrieve the filename within the URL, so 
+						# we can check if it's a file with an interesting
+						# extension.
+						#**********************************************
+						vx_file = vx_url.split("/")[-1]	
+						#**********************************************
+						# If the file contains "?", we likely have a query
+						# within the name, we need to weed it out.
+						#**********************************************
+						if (u"?" in vx_file):
+							tmp_file = vx_file.split(u"?")
+							#
+							# TODO:
+							# [ ] Check if the file is in the first
+							# or second item of the split, ie.
+							# file.exe?dl=1 or
+							# download.php?file=bad.exe
+							# Use a RE for this.
+							vx_file = tmp_file[0]
+					
+						#**********************************************
+						# Finally, get the extension and confirm we will
+						# keep the URL.
+						#**********************************************
+						vx_ext = vx_file.split('.')[-1]
+						#**********************************************
+						# If the extension is greater than 5 chars, it's
+						# probably a bad URL.
+						#**********************************************
+						if (len(vx_ext) > 5):
+							vx_ext = ""
+
+						if (vx_ext in self.extensions):
+							return vx_url
+						
+			else:
+					self.logger.print_warning(ERR_FAILED_PARSE_MALCODE.format(desc))
+		else:
+			raise RssEntryNoContent()
+			
+		return None
+	
+		
+class MdlHunter(RssHunter):
 
 	DefaultThreadName = u"vx-hunter-mdl"
 	RssSummarySeparator = u":"
 	RssContentsSeparator = u","	
 	
 	URL = 'http://www.malwaredomainlist.com/hostslist/mdl.xml'
-	URL_MARKER = "Host:"
+	UrlMarker = "Host:"
 	
 	def __init__(self, _engine, _extensions = Hunter.HuntedExtensions, _logger=None):
-		super(MalcodeHunter, self).__init__(_engine, _extensions, _logger)	
-		self.name=MdlHunter.DefaultThreadName
+		super(MdlHunter, self).__init__(_engine, _extensions, _logger)	
+		self.thread_name=MdlHunter.DefaultThreadName
+		self.rss_feed = MdlHunter.URL
 		self.last_entry = u""
 	
-	def get_new_urls_since(self, _date, _max=150):
-		"""
-		
-		Note: Malc0de does not include dates within their posts on their RSS feed,
-		so this method returns the maximum number of entries when used for the first
-		time, or all entries between the current run and the last one.
-		
-		Args:
-			_date: Last time the source was checked for new malware.
-			_max: Maximum number of entries to consider.
-			
-		Returns:
-			Array of strings representing URLs to malware files.
-			
-		Raises:
-			None.
-		"""
-		urls = []
-		
-		#**********************************************************************
-		# Retrieve the RSS feed from Malcode:
-		#**********************************************************************
-		self.logger.print_debug(MSG_INFO_CONNECTING.format(MdlHunter.URL))
-		mdl_rss = feedparser.parse(MdlHunter.URL)
-		#**********************************************************************
-		# Start processing entries if any where found.
-		#**********************************************************************
-		if (len(mdl_rss.entries) > 0):
-			#
-			# Verifies if some of the entries are new. I.e. check all the 
-			# entries between the first one retrieve and the last entry processed
-			# and stored in self.last_entry
-			# TODO:
-			#	[ ] Value of self.last_entry should be retrieved from the database.
-			nb_entries = 0
-			while (self.last_entry != mdl_rss.entries[nb_entries] and nb_entries < _max):
-				nb_entries += 1
-					
-			#
-			# If new entries are found, start recoding them
-			# if there's not already a sample in the vault (based on a hash)
-			#
-			if (nb_entries > 0):
-				self.logger.print_info(INFO_NBENTRIES_FOUND.format(nb_entries))
-				self.last_entry = mdl_rss.entries[0]
-		
-				for i in range(0, nb_entries):
-					#
-					# Information about the malware is stored in the summary
-					# of the RSS post.
-					#
-					desc = mdl_rss.entries[i].summary.strip()
-					
-					desc_items = desc.split(MdlHunter.RssContentsSeparator)
-					url_data = desc_items[0]
-		
-					#**********************************************************
-					# There should be 5 items in the summary of the post, if
-					# not, then something is wrong, ignore it.
-					#**********************************************************
-					if (len(desc_items) == 5):
-						if (MdlHunter.URL_MARKER in url_data):
-							if (MdlHunter.RssSummarySeparator in url_data):
-								url_data = url_data.split(MdlHunter.RssSummarySeparator)[1]
-							url_data = url_data.strip()
-		
-							if (len(url_data) > 0):
-								#**********************************************
-								# Prepends "HTTP" at the beginning of the found 
-								# URL, as it is usually not included.
-								#**********************************************
-								vx_url = url_data
-								if (url_data[0:4].lower() != "http"):
-									vx_url = HTTP_URL_FORMAT.format(url_data)
-											
-								#**********************************************
-								# Retrieve the filename within the URL, so 
-								# we can check if it's a file with an interesting
-								# extension.
-								#**********************************************
-								vx_file = vx_url.split("/")[-1]	
-								#**********************************************
-								# If the file contains "?", we likely have a query
-								# within the name, we need to weed it out.
-								#**********************************************
-								if (u"?" in vx_file):
-									tmp_file = vx_file.split(u"?")
-									#
-									# TODO:
-									# [ ] Check if the file is in the first
-									# or second item of the split, ie.
-									# file.exe?dl=1 or
-									# download.php?file=bad.exe
-									# Use a RE for this.
-									vx_file = tmp_file[0]
-							
-								#**********************************************
-								# Finally, get the extension and confirm we will
-								# keep the URL.
-								#**********************************************
-								vx_ext = vx_file.split('.')[-1]
-								#**********************************************
-								# If the extension is greater than 5 chars, it's
-								# probably a bad URL.
-								#**********************************************
-								if (len(vx_ext) > 5):
-									vx_ext = ""
+	def _get_url_from_entry(self, _title, _summary, _link):
+		if (_summary and len(_summary) > 0):
+			tokens = _summary.split(MdlHunter.RssContentsSeparator)
+			url_data = tokens[0]
 
-								if (vx_ext in self.extensions):
-									urls.append(vx_url)
-						else:
-							self.logger.print_warning(ERR_NO_URL_POST.format(desc))
-					else:
-						self.logger.print_warning(ERR_FAILED_PARSE_MALCODE.format(desc))
+				#**********************************************************
+				# There should be 5 items in the summary of the post, if
+				# not, then something is wrong, ignore it.
+				#**********************************************************
+			if (len(tokens) == 5):
+				if (MdlHunter.UrlMarker in url_data):
+					if (MdlHunter.RssSummarySeparator in url_data):
+						url_data = url_data.split(MdlHunter.RssSummarySeparator)[1]
+					
+					if (url_data and len(url_data.strip()) > 0):
+						url_data = url_data.strip()
+						#**********************************************
+						# Prepends "HTTP" at the beginning of the found 
+						# URL, as it is usually not included.
+						#**********************************************
+						vx_url = url_data
+						if (url_data[0:4].lower() != "http"):
+							vx_url = HTTP_URL_FORMAT.format(url_data)
+									
+						#**********************************************
+						# Retrieve the filename within the URL, so 
+						# we can check if it's a file with an interesting
+						# extension.
+						#**********************************************
+						vx_file = vx_url.split("/")[-1]	
+						#**********************************************
+						# If the file contains "?", we likely have a query
+						# within the name, we need to weed it out.
+						#**********************************************
+						if (u"?" in vx_file):
+							tmp_file = vx_file.split(u"?")
+							#
+							# TODO:
+							# [ ] Check if the file is in the first
+							# or second item of the split, ie.
+							# file.exe?dl=1 or
+							# download.php?file=bad.exe
+							# Use a RE for this.
+							vx_file = tmp_file[0]
+					
+						#**********************************************
+						# Finally, get the extension and confirm we will
+						# keep the URL.
+						#**********************************************
+						vx_ext = vx_file.split('.')[-1]
+						#**********************************************
+						# If the extension is greater than 5 chars, it's
+						# probably a bad URL.
+						#**********************************************
+						if (len(vx_ext) > 5):
+							vx_ext = ""
+
+						if (vx_ext in self.extensions):
+							return vx_url
+						
 			else:
-				self.logger.print_warning(WARN_NO_NEW_ENTRIES)
-		return urls	
-		
+					self.logger.print_warning(ERR_FAILED_PARSE_MALCODE.format(desc))
+		else:
+			raise RssEntryNoContent()
+			
+		return None
+	
+
 class LocalHunter(Hunter):
 
 	DefaultUrlRE = r'(h(tt|xx)ps?://[^\s]+)'
-
+	DefaultThreadName = "LocalFileHunter"
+	
 	def __init__(self, _engine, _files=[], _extensions = [], _logger=None):
 		super(LocalHunter, self).__init__(_engine, _extensions, _logger)
 		self.files = _files
+		self.thread_name = LocalHunter.DefaultThreadName
 		if (len(_extensions) > 0):
 			ext_re = "|".join(_extensions)
 			LocalHunter.DefaultUrlRE = r'(h(tt|xx)ps?://[^\s]+\.(' + ext_re + '))'
@@ -498,10 +472,11 @@ class LocalHunter(Hunter):
 		if (_file and len(_file) > 0):
 			if (os.path.exists(_file)):
 				with open(_file, "r") as f:
-					contents = f.read().lower().strip()
-				
+					contents = f.read()
+
 				urls = []
-				if (len(contents) > 0):
+				if (contents and len(contents) > 0):
+					contents = contents.lower().strip()
 					found_urls = re.findall(LocalHunter.DefaultUrlRE, contents)
 					for found_url in found_urls:
 						vx_url = found_url[0]
@@ -518,11 +493,10 @@ class LocalHunter(Hunter):
 				
 	def get_urls_from_files(self, _files):
 		urls = self._get_urls_from_files(_files)
-		print(urls)
 		return urls
 		
 				
-	def get_new_urls_since(self, _date, _max=150):
+	def get_new_urls_since(self, _date, _max=DEFAULT_MAX_ENTRIES):
 		urls = []
 		urls = self._get_urls_from_files(self.files)
 		return urls
