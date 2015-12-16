@@ -135,6 +135,7 @@ class Engine(object):
 		
 		self.saveUndetectedFiles = _saveFileNoDetection
 		self.active_hunters = []
+		self.hunt_is_on = False
 		
 	def __str__(self):
 		return "<Engine>"
@@ -304,8 +305,9 @@ class Engine(object):
 				NullOrEmptyArgumentException: if the URL or destination path is empty or null.
 				FileDownloadException: If the function failed to create the local file.				
 		"""
-		url = _url.strip()
-		if (url and len(url) > 0):
+		
+		if (_url and len(_url.strip()) > 0):
+			url = _url.strip()
 			#******************************************************************
 			# Verifies if the URL provided is valid
 			#******************************************************************
@@ -376,7 +378,7 @@ class Engine(object):
 		new_string = _string
 		for char in _chars:
 			if char in _string:	
-				new_string = new_string.replace()
+				new_string = new_string.replace(char, _replace)
 		return new_string
 	
 	def download_file(self, _url, _dst):
@@ -659,17 +661,25 @@ class Engine(object):
 		hunt_malcode = MalcodeHunter(
 			_engine=self,
 			_logger=self.logger)
+		hunt_mdl = MdlHunter(
+			_engine=self,
+			_logger=self.logger)
 		hunt_local = LocalHunter(
 			_engine = self, 
-			_files = [self.vxvault], 
+			_files = [self.vxvault.file_system.get_urls_dump()], 
 			_extensions = Hunter.HuntedExtensions,
 			_logger = self.logger)
 			
 		self.active_hunters.append(hunt_malcode)
+		self.active_hunters.append(hunt_mdl)
 		self.active_hunters.append(hunt_local)
 		
 		for hunter in self.active_hunters:
 			hunter.start()
+	
+		
+		#self.stop_malware_hunt()
+
 	
 	def stop_malware_hunt(self):
 		"""
@@ -687,7 +697,7 @@ class Engine(object):
 		for hunter in self.active_hunters:
 			hunter.stop_hunting()
 			hunter.join()
-			
+		
 	def file_is_archived(self, _file):
 		""" Verifies if the given file is already stored in one of the
 		archive in the vault.
