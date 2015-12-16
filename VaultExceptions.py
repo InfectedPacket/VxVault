@@ -59,6 +59,7 @@ ERR_CREATE_ARCHIVE		=	"Error while creating the archive: {:s}."
 ERR_VIRUS_NO_FILE		=	"Virus object contains no file."
 ERR_NO_URL_POST			=	u"Could not find URL in post: \n{:s}"
 ERR_NO_URL_FOUND		=	u"No URL found in provided file(s)."
+ERR_RSS_EMPTY_ENTRY		=	u"RSS entry does not contains any data."
 #
 # Information messages
 #
@@ -94,7 +95,7 @@ class VaultException(Exception):
 class NullOrEmptyArgumentException(VaultException):
 
 	def __init__(self):
-		super(NullOrEmptyArgument, self).__init__(ERR_EMPTY_OR_NULL_ARG)
+		super(NullOrEmptyArgumentException, self).__init__(ERR_EMPTY_OR_NULL_ARG)
 		
 class FileNotFoundException(VaultException):
 
@@ -165,3 +166,9 @@ class ArchiveCreationException(VaultException):
 
 	def __init__(self, _info="Unknown cause"):
 		super(ArchiveCreationException, self).__init__(ERR_CREATE_ARCHIVE.format(_info))
+		
+class RssEntryNoContent(VaultException):
+
+	def __init__(self, _info=""):
+		super(RssEntryNoContent, self).__init__(ERR_RSS_EMPTY_ENTRY)
+		
