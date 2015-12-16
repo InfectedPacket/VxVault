@@ -212,7 +212,7 @@ class Vault(object):
 		if (_file and len(_file) > 0):
 			return self.database.file_exists(_file)
 		else:
-			raise Exception("No args")
+			raise NullOrEmptyArgumentException()
 		
 	def set_archiver(self, _archiver):
 		""" Sets the Archiver to be used by the Vault to archive and 
@@ -642,7 +642,7 @@ class FileSystem(object):
 		else:
 			raise FileNotFoundException(self.base)
 			
-	def archive_file(self, _vx, _password=Vault.DefaultArchivePassword):
+	def archive_file(self, _vx, _password=Vault.DefaultArchivePassword, _multipleSamplesAllowed=False):
 		"""Archives the malware into the file system.
 
 		This function will archive the file(s) contained in the Virus
@@ -688,7 +688,7 @@ class FileSystem(object):
 			#
 			_vx.set_password(_password)
 			archive_name = self.archiver.archive(_vx, dst_path, 
-				_multipleSamplesAllowed = self.allowMultipleSamples)
+				_multipleSamplesAllowed = _multipleSamplesAllowed)
 
 			#
 			# Delete the original files from the pit. Prevents
